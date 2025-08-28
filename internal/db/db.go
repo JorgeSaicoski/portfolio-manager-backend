@@ -80,13 +80,13 @@ func (d *Database) Migrate() error {
 }
 
 func (d *Database) buildDSN() string {
-	host := d.getEnv("BACKEND_DB_HOST", "localhost")
-	port := d.getEnv("BACKEND_DB_PORT", "5433")
-	user := d.getEnv("BACKEND_DB_USER", "backend_user")
-	password := d.getEnv("BACKEND_DB_PASSWORD", "backend_pass")
-	dbname := d.getEnv("BACKEND_DB_NAME", "backend_db")
-	sslmode := d.getEnv("BACKEND_DB_SSLMODE", "disable")
-	timezone := d.getEnv("BACKEND_DB_TIMEZONE", "UTC")
+	host := d.getEnv("DB_HOST", "localhost")
+	port := d.getEnv("DB_PORT", "5432")
+	user := d.getEnv("DB_USER", "backend_user")
+	password := d.getEnv("DB_PASSWORD", "backend_pass")
+	dbname := d.getEnv("DB_NAME", "db")
+	sslmode := d.getEnv("DB_SSLMODE", "disable")
+	timezone := d.getEnv("DB_TIMEZONE", "UTC")
 
 	return fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=%s",
 		host, user, password, dbname, port, sslmode, timezone)
