@@ -1,40 +1,44 @@
 package main
 
 import (
-	"net/http"
 	"os"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/db"
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/router"
-	"github.com/gin-gonic/gin"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/server"
+	"github.com/sirupsen/logrus"
 )
 
 func main() {
-	// Create a Gin router with default middleware (logger and recovery)
-	r := gin.Default()
-
-	// Define the /health route (matching Docker health check)
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status":  "healthy",
-			"message": "Backend service is running",
-			"service": "portfolio-backend",
-		})
-	})
+	logger := setupLogger()
 
 	database := db.NewDatabase()
 	database.Migrate()
 	database.Initialize()
 
-	router := router.NewRouter(database.DB)
-	router.RegisterPortfolioRoutes(r)
-
-	// Get port from environment or default to 8000 (matching Docker)
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8000"
 	}
 
-	// Start the server on the correct port
-	r.Run(":" + port)
+	srv := server.NewServer(port, database, logger)
+
+	if err := srv.Start(); err != nil {
+		logger.WithError(err).Fatal("Failed to start server")
+	}
+}
+
+func setupLogger() *logrus.Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.JSONFormatter{})
+
+	level := os.Getenv("LOG_LEVEL")
+	if level == "" {
+		level = "info"
+	}
+
+	if parsedLevel, err := logrus.ParseLevel(level); err == nil {
+		logger.SetLevel(parsedLevel)
+	}
+
+	return logger
 }
