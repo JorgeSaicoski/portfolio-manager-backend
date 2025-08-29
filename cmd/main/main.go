@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/db"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/router"
 	"github.com/gin-gonic/gin"
 )
 
@@ -24,6 +25,9 @@ func main() {
 	database := db.NewDatabase()
 	database.Migrate()
 	database.Initialize()
+
+	router := router.NewRouter(database.DB)
+	router.RegisterPortfolioRoutes(r)
 
 	// Get port from environment or default to 8000 (matching Docker)
 	port := os.Getenv("PORT")
