@@ -25,7 +25,24 @@ func NewPortfolioHandler(repo repo.PortfolioRepository, metrics *metrics.Collect
 func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 
-	portfolios, err := h.repo.GetByOwnerID(userID, 10, 0) // limit: 10, offset: 0
+	// Parse pagination parameters
+	page := 1
+	if pageStr := c.Query("page"); pageStr != "" {
+		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
+			page = p
+		}
+	}
+
+	limit := 10
+	if limitStr := c.Query("limit"); limitStr != "" {
+		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	portfolios, err := h.repo.GetByOwnerID(userID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve portfolios",
@@ -35,10 +52,11 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{
 		"portfolios": portfolios,
+		"page":       page,
+		"limit":      limit,
 		"message":    "Success",
 	})
 }
-
 func (h *PortfolioHandler) Update(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 	portfolioID := c.Param("id")

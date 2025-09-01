@@ -9,6 +9,12 @@ func (r *Router) RegisterPortfolioRoutes(engine *gin.Engine) {
 	portfolios := engine.Group("/portfolios")
 	portfolios.Use(middleware.AuthMiddleware())
 	{
-		portfolios.GET("/user", r.portfolioHandler.GetByUser)
+		portfolios.GET("/own", r.portfolioHandler.GetByUser)
+		portfolios.POST("/own", r.portfolioHandler.Create)
+		portfolios.PUT("/own/id/:id", r.portfolioHandler.Update)
+		portfolios.DELETE("/own/id/:id", r.portfolioHandler.Delete)
 	}
+	// will create the public routes here.
+	// get portfolios/id/:id
+	// so the user will receive the portfolio that he is visiting
 }
