@@ -5,8 +5,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func (r *Router) RegisterPortfolioRoutes(engine *gin.Engine) {
-	portfolios := engine.Group("/portfolios")
+func (r *Router) RegisterPortfolioRoutes(apiGroup *gin.RouterGroup) {
+	portfolios := apiGroup.Group("/portfolios")
 	portfolios.Use(middleware.AuthMiddleware())
 	{
 		portfolios.GET("/own", r.portfolioHandler.GetByUser)

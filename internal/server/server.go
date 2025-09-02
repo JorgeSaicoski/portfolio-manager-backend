@@ -76,12 +76,11 @@ func (s *Server) setupRoutes() {
 	// Health check
 	s.engine.GET("/health", s.healthHandler)
 	s.engine.GET("/ready", s.readinessHandler)
-
-	// Metrics endpoint
 	s.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
-	// Register business routes
-	s.router.RegisterPortfolioRoutes(s.engine)
+	// API group
+	api := s.engine.Group("/api")
+	s.router.RegisterPortfolioRoutes(api)
 }
 
 func (s *Server) healthHandler(c *gin.Context) {
