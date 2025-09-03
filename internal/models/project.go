@@ -14,4 +14,5 @@ type Project struct {
 	Client      string   `json:"client"`
 	Link        string   `json:"link"`
 	OwnerID     string   `json:"ownerId,omitempty"`
+	CategoryID  uint     `json:"category_id"`
 }

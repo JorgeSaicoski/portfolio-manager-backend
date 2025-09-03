@@ -9,5 +9,4 @@ type Portfolio struct {
 	Sections    []Section  `json:"sections" gorm:"foreignKey:PortfolioID"`
 	Categories  []Category `json:"categories" gorm:"foreignKey:PortfolioID"`
 	OwnerID     string     `json:"ownerId,omitempty"`
-	CategoryID  uint       `json:"category_id"`
 }

@@ -12,8 +12,8 @@ func main() {
 	logger := setupLogger()
 
 	database := db.NewDatabase()
-	database.Migrate()
 	database.Initialize()
+	database.Migrate()
 
 	port := os.Getenv("PORT")
 	if port == "" {
