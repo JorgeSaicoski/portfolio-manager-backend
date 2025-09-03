@@ -8,4 +8,5 @@ type Section struct {
 	Description *string `json:"description,omitempty"`
 	Type        string  `json:"type"`
 	OwnerID     string  `json:"ownerId,omitempty"`
+	PortfolioID uint    `json:"portfolio_id"`
 }

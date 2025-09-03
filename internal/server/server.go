@@ -77,6 +77,7 @@ func (s *Server) setupRoutes() {
 	s.engine.GET("/health", s.healthHandler)
 	s.engine.GET("/ready", s.readinessHandler)
 	s.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	s.engine.HEAD("/health", s.readinessHandler)
 
 	// API group
 	api := s.engine.Group("/api")

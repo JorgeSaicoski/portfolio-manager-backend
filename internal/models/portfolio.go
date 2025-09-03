@@ -6,7 +6,8 @@ type Portfolio struct {
 	gorm.Model
 	Title       string     `json:"title"`
 	Description *string    `json:"description,omitempty"`
-	Sections    []Section  `json:"sections" gorm:"foreignKey:SectionID"`
-	Categories  []Category `json:"categories" gorm:"foreignKey:CategoryID"`
+	Sections    []Section  `json:"sections" gorm:"foreignKey:PortfolioID"`
+	Categories  []Category `json:"categories" gorm:"foreignKey:PortfolioID"`
 	OwnerID     string     `json:"ownerId,omitempty"`
+	CategoryID  uint       `json:"category_id"`
 }
