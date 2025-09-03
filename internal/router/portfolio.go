@@ -14,7 +14,6 @@ func (r *Router) RegisterPortfolioRoutes(apiGroup *gin.RouterGroup) {
 		portfolios.PUT("/own/id/:id", r.portfolioHandler.Update)
 		portfolios.DELETE("/own/id/:id", r.portfolioHandler.Delete)
 	}
-	// will create the public routes here.
-	// get portfolios/id/:id
-	// so the user will receive the portfolio that he is visiting
+	// Public routes - no auth required
+	apiGroup.GET("/portfolios/id/:id", r.portfolioHandler.GetByIDPublic)
 }

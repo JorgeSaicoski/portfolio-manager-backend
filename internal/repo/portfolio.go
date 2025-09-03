@@ -19,21 +19,34 @@ func (r *portfolioRepository) Create(portfolio *models.Portfolio) error {
 	return r.db.Create(portfolio).Error
 }
 
-func (r *portfolioRepository) GetByID(id uint) (*models.Portfolio, error) {
+// For list views - only basic portfolio info
+func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Portfolio, error) {
+	var portfolios []*models.Portfolio
+	err := r.db.Select("id, title, description, owner_id, created_at, updated_at").
+		Where("owner_id = ?", ownerID).
+		Limit(limit).Offset(offset).
+		Find(&portfolios).Error
+	return portfolios, err
+}
+
+// For detail views - with relationships using JOIN
+func (r *portfolioRepository) GetByIDWithRelations(id uint) (*models.Portfolio, error) {
 	var portfolio models.Portfolio
-	err := r.db.Preload("Sections").Preload("Categories").First(&portfolio, id).Error
+	err := r.db.Select("portfolios.*, sections.id as section_id, sections.title as section_title, categories.id as category_id, categories.name as category_name").
+		Joins("LEFT JOIN sections ON sections.portfolio_id = portfolios.id AND sections.deleted_at IS NULL").
+		Joins("LEFT JOIN categories ON categories.portfolio_id = portfolios.id AND categories.deleted_at IS NULL").
+		Where("portfolios.id = ?", id).
+		First(&portfolio).Error
+	return &portfolio, err
+}
+
+func (r *portfolioRepository) GetByIDBasic(id uint) (*models.Portfolio, error) {
+	var portfolio models.Portfolio
+	err := r.db.Select("id, owner_id").First(&portfolio, id).Error
 	if err != nil {
 		return nil, err
 	}
 	return &portfolio, nil
-}
-
-func (r *portfolioRepository) GetByOwnerID(ownerID string, limit, offset int) ([]*models.Portfolio, error) {
-	var portfolios []*models.Portfolio
-	err := r.db.Preload("Sections").Preload("Categories").Where("owner_id = ?", ownerID).Find(&portfolios).
-		Limit(limit).Offset(offset).
-		Find(&portfolios).Error
-	return portfolios, err
 }
 
 func (r *portfolioRepository) Update(portfolio *models.Portfolio) error {

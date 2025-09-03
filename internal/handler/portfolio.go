@@ -42,7 +42,7 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	portfolios, err := h.repo.GetByOwnerID(userID, limit, offset)
+	portfolios, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve portfolios",
@@ -127,7 +127,46 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 }
 
 func (h *PortfolioHandler) Delete(c *gin.Context) {
-	userID := c.GetString("userID") // From auth middleware
+	userID := c.GetString("userID")
+	portfolioID := c.Param("id")
+
+	id, err := strconv.Atoi(portfolioID)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid portfolio ID",
+		})
+		return
+	}
+
+	// Use basic method - only fetch id and owner_id for authorization
+	portfolio, err := h.repo.GetByIDBasic(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Portfolio not found",
+		})
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "Access denied",
+		})
+		return
+	}
+
+	if err := h.repo.Delete(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to delete portfolio",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Portfolio deleted successfully",
+	})
+}
+
+func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 	portfolioID := c.Param("id")
 
 	// Parse portfolio ID
@@ -139,8 +178,8 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Check if portfolio exists and belongs to user
-	portfolio, err := h.repo.GetByID(uint(id))
+	// Get complete portfolio with relationships
+	portfolio, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Portfolio not found",
@@ -148,23 +187,8 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Check ownership
-	if portfolio.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied",
-		})
-		return
-	}
-
-	// Delete portfolio
-	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete portfolio",
-		})
-		return
-	}
-
 	c.JSON(http.StatusOK, gin.H{
-		"message": "Portfolio deleted successfully",
+		"portfolio": portfolio,
+		"message":   "Success",
 	})
 }

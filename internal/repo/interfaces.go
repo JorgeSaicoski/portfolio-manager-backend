@@ -6,8 +6,9 @@ import (
 
 type PortfolioRepository interface {
 	Create(portfolio *models.Portfolio) error
-	GetByID(id uint) (*models.Portfolio, error)
-	GetByOwnerID(ownerID string, limit, offset int) ([]*models.Portfolio, error)
+	GetByIDWithRelations(id uint) (*models.Portfolio, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Portfolio, error)
+	GetByIDBasic(id uint) (*models.Portfolio, error)
 	Update(portfolio *models.Portfolio) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Portfolio, error)
