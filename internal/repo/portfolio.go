@@ -32,7 +32,7 @@ func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset in
 // For detail views - with relationships using JOIN
 func (r *portfolioRepository) GetByIDWithRelations(id uint) (*models.Portfolio, error) {
 	var portfolio models.Portfolio
-	err := r.db.Select("portfolios.*, sections.id as section_id, sections.title as section_title, categories.id as category_id, categories.name as category_name").
+	err := r.db.Select("portfolios.*, sections.id as section_id, sections.title as section_title, categories.id as category_id, categories.title as category_title").
 		Joins("LEFT JOIN sections ON sections.portfolio_id = portfolios.id AND sections.deleted_at IS NULL").
 		Joins("LEFT JOIN categories ON categories.portfolio_id = portfolios.id AND categories.deleted_at IS NULL").
 		Where("portfolios.id = ?", id).
