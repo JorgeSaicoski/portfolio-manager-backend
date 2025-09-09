@@ -31,7 +31,7 @@ func (r *sectionRepository) GetByPortfolioIDBasic(portfolioID string) ([]*models
 // For detail views - with relationships using JOIN
 func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, error) {
 	var section models.Section
-	err := r.db.Preload("Portfolio").Preload("Categories").
+	err := r.db.Preload("Portfolio").
 		Where("id = ?", id).
 		First(&section).Error
 	return &section, err
@@ -39,7 +39,7 @@ func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, erro
 
 func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error) {
 	var sections []*models.Section
-	err := r.db.Preload("Portfolio").Preload("Categories").
+	err := r.db.Preload("Portfolio").
 		Where("portfolio_id = ?", portfolioID).
 		Find(&sections).Error
 	return sections, err
@@ -62,8 +62,7 @@ func (r *sectionRepository) Delete(id uint) error {
 
 func (r *sectionRepository) List(limit, offset int) ([]*models.Section, error) {
 	var sections []*models.Section
-	err := r.db.Preload("Portfolio").Preload("Categories").
-		Limit(limit).Offset(offset).
+	err := r.db.Limit(limit).Offset(offset).
 		Find(&sections).Error
 	return sections, err
 }
