@@ -27,8 +27,9 @@ type ProjectRepository interface {
 
 type SectionRepository interface {
 	Create(section *models.Section) error
-	GetByID(id uint) (*models.Section, error)
-	GetByPortfolioID(portfolioID string) ([]*models.Section, error)
+	GetByIDWithRelations(id uint) (*models.Section, error)
+	GetByPortfolioIDBasic(portfolioID string) ([]*models.Section, error)
+	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error)
 	GetByType(sectionType string) ([]*models.Section, error)
 	Update(section *models.Section) error
 	Delete(id uint) error
