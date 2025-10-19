@@ -82,6 +82,9 @@ func (s *Server) setupRoutes() {
 	// API group
 	api := s.engine.Group("/api")
 	s.router.RegisterPortfolioRoutes(api)
+	s.router.RegisterCategoryRoutes(api)
+	s.router.RegisterProjectRoutes(api)
+	s.router.RegisterSectionRoutes(api)
 }
 
 func (s *Server) healthHandler(c *gin.Context) {

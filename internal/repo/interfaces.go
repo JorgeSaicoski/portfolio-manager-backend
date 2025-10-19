@@ -39,7 +39,11 @@ type SectionRepository interface {
 type CategoryRepository interface {
 	Create(category *models.Category) error
 	GetByID(id uint) (*models.Category, error)
+	GetByIDBasic(id uint) (*models.Category, error)
+	GetByIDWithRelations(id uint) (*models.Category, error)
 	GetByPortfolioID(portfolioID string) ([]*models.Category, error)
+	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Category, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Category, error)
 	Update(category *models.Category) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Category, error)

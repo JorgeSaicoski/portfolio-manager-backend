@@ -4,6 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto/request"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/repo"
@@ -26,35 +29,27 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 
 	// Parse pagination parameters
-	page := 1
-	if pageStr := c.Query("page"); pageStr != "" {
-		if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
-			page = p
-		}
+	var pagination dto.PaginationQuery
+	if err := c.ShouldBindQuery(&pagination); err != nil {
+		pagination = dto.PaginationQuery{Page: 1, Limit: 10}
 	}
 
-	limit := 10
-	if limitStr := c.Query("limit"); limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil && l > 0 && l <= 100 {
-			limit = l
-		}
-	}
-
-	offset := (page - 1) * limit
+	page, limit := pagination.GetPageAndLimit()
+	offset := pagination.GetOffset()
 
 	portfolios, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve portfolios",
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to retrieve portfolios",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"portfolios": portfolios,
-		"page":       page,
-		"limit":      limit,
-		"message":    "Success",
+	c.JSON(http.StatusOK, dto.PaginatedResponse{
+		Data:    response.ToPortfolioListResponse(portfolios),
+		Page:    page,
+		Limit:   limit,
+		Message: "Success",
 	})
 }
 func (h *PortfolioHandler) Update(c *gin.Context) {
@@ -64,36 +59,40 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	// Parse portfolio ID
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid portfolio ID",
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid portfolio ID",
 		})
 		return
 	}
 
 	// Parse request body
-	var updateData models.Portfolio
-	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
+	var req request.UpdatePortfolioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request data",
 		})
 		return
 	}
 
-	// Set the ID and owner
+	// Convert DTO to model
+	updateData := models.Portfolio{
+		Title:       req.Title,
+		Description: req.Description,
+		OwnerID:     userID,
+	}
 	updateData.ID = uint(id)
-	updateData.OwnerID = userID
 
 	// Update portfolio
 	if err := h.repo.Update(&updateData); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update portfolio",
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to update portfolio",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"portfolio": &updateData,
-		"message":   "Portfolio updated successfully",
+	c.JSON(http.StatusOK, dto.SuccessResponse{
+		Message: "Portfolio updated successfully",
+		Data:    response.ToPortfolioResponse(&updateData),
 	})
 }
 
@@ -101,28 +100,32 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 
 	// Parse request body
-	var newPortfolio models.Portfolio
-	if err := c.ShouldBindJSON(&newPortfolio); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
+	var req request.CreatePortfolioRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid request data",
 		})
 		return
 	}
 
-	// Set the owner
-	newPortfolio.OwnerID = userID
+	// Convert DTO to model
+	newPortfolio := models.Portfolio{
+		Title:       req.Title,
+		Description: req.Description,
+		OwnerID:     userID,
+	}
 
 	// Create portfolio
 	if err := h.repo.Create(&newPortfolio); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create portfolio",
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to create portfolio",
 		})
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"portfolio": &newPortfolio,
-		"message":   "Portfolio created successfully",
+	c.JSON(http.StatusCreated, dto.SuccessResponse{
+		Message: "Portfolio created successfully",
+		Data:    response.ToPortfolioResponse(&newPortfolio),
 	})
 }
 
@@ -132,8 +135,8 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid portfolio ID",
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid portfolio ID",
 		})
 		return
 	}
@@ -141,28 +144,28 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 	// Use basic method - only fetch id and owner_id for authorization
 	portfolio, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Portfolio not found",
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error: "Portfolio not found",
 		})
 		return
 	}
 
 	if portfolio.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied",
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error: "Access denied",
 		})
 		return
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete portfolio",
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to delete portfolio",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Portfolio deleted successfully",
+	c.JSON(http.StatusOK, dto.SuccessResponse{
+		Message: "Portfolio deleted successfully",
 	})
 }
 
@@ -172,8 +175,8 @@ func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 	// Parse portfolio ID
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid portfolio ID",
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Invalid portfolio ID",
 		})
 		return
 	}
@@ -181,14 +184,14 @@ func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 	// Get complete portfolio with relationships
 	portfolio, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Portfolio not found",
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error: "Portfolio not found",
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"portfolio": portfolio,
-		"message":   "Success",
+	c.JSON(http.StatusOK, dto.SuccessResponse{
+		Message: "Success",
+		Data:    response.ToPortfolioDetailResponse(portfolio),
 	})
 }
