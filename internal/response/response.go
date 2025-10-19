@@ -23,17 +23,19 @@ func Success(c *gin.Context, statusCode int, data interface{}, message string) {
 
 // SuccessWithKey sends a standardized success response with a custom data key
 // Useful when you want the response to have a specific key like "project", "category", etc.
+// Note: Now uses "data" as the standard key for consistency with REST API best practices
 func SuccessWithKey(c *gin.Context, statusCode int, key string, data interface{}, message string) {
 	c.JSON(statusCode, gin.H{
-		key:       data,
+		"data":    data,
 		"message": message,
 	})
 }
 
 // SuccessWithPagination sends a standardized paginated success response
+// Note: Uses "data" as the standard key for consistency with REST API best practices
 func SuccessWithPagination(c *gin.Context, statusCode int, key string, data interface{}, page, limit int) {
 	c.JSON(statusCode, gin.H{
-		key:       data,
+		"data":    data,
 		"page":    page,
 		"limit":   limit,
 		"message": "Success",

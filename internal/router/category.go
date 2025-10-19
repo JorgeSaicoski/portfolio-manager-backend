@@ -7,13 +7,19 @@ import (
 
 func (r *Router) RegisterCategoryRoutes(apiGroup *gin.RouterGroup) {
 	categories := apiGroup.Group("/categories")
-	categories.Use(middleware.AuthMiddleware())
+
+	// Protected routes - require authentication
+	protected := categories.Group("/own")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		categories.GET("/own", r.categoryHandler.GetByUser)
-		categories.POST("/own", r.categoryHandler.Create)
-		categories.PUT("/own/id/:id", r.categoryHandler.Update)
-		categories.DELETE("/own/id/:id", r.categoryHandler.Delete)
+		protected.GET("", r.categoryHandler.GetByUser)
+		protected.POST("", r.categoryHandler.Create)
+		protected.GET("/:id", r.categoryHandler.GetByIDPublic) // Authenticated users can also view
+		protected.PUT("/:id", r.categoryHandler.Update)
+		protected.DELETE("/:id", r.categoryHandler.Delete)
 	}
+
 	// Public routes - no auth required
-	apiGroup.GET("/categories/id/:id", r.categoryHandler.GetByIDPublic)
+	categories.GET("/id/:id", r.categoryHandler.GetByIDPublic)
+	categories.GET("/public/:id", r.categoryHandler.GetByIDPublic)
 }

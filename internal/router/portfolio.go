@@ -7,13 +7,20 @@ import (
 
 func (r *Router) RegisterPortfolioRoutes(apiGroup *gin.RouterGroup) {
 	portfolios := apiGroup.Group("/portfolios")
-	portfolios.Use(middleware.AuthMiddleware())
+
+	// Protected routes - require authentication
+	protected := portfolios.Group("/own")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		portfolios.GET("/own", r.portfolioHandler.GetByUser)
-		portfolios.POST("/own", r.portfolioHandler.Create)
-		portfolios.PUT("/own/id/:id", r.portfolioHandler.Update)
-		portfolios.DELETE("/own/id/:id", r.portfolioHandler.Delete)
+		protected.GET("", r.portfolioHandler.GetByUser)
+		protected.POST("", r.portfolioHandler.Create)
+		protected.GET("/:id", r.portfolioHandler.GetByIDPublic) // Authenticated users can also view
+		protected.PUT("/:id", r.portfolioHandler.Update)
+		protected.DELETE("/:id", r.portfolioHandler.Delete)
 	}
+
 	// Public routes - no auth required
-	apiGroup.GET("/portfolios/id/:id", r.portfolioHandler.GetByIDPublic)
+	portfolios.GET("/id/:id", r.portfolioHandler.GetByIDPublic)
+	portfolios.GET("/public/:id", r.portfolioHandler.GetByIDPublic)
+	portfolios.GET("/public/:id/categories", r.categoryHandler.GetByPortfolio)
 }

@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
@@ -80,6 +81,18 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Check if category exists and belongs to user
+	existing, err := h.repo.GetByIDBasic(uint(id))
+	if err != nil {
+		response.NotFound(c, "Category not found")
+		return
+	}
+
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
 	// Update category
 	if err := h.repo.Update(&updateData); err != nil {
 		response.InternalError(c, "Failed to update category")
@@ -110,6 +123,12 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 
 	// Create category
 	if err := h.repo.Create(&newCategory); err != nil {
+		// Check if error is due to foreign key constraint (invalid portfolio_id)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "fk_portfolios_categories") || strings.Contains(errMsg, "23503") {
+			response.NotFound(c, "Portfolio not found")
+			return
+		}
 		response.InternalError(c, "Failed to create category")
 		return
 	}
@@ -165,4 +184,17 @@ func (h *CategoryHandler) GetByIDPublic(c *gin.Context) {
 	}
 
 	response.OK(c, "category", category, "Success")
+}
+
+func (h *CategoryHandler) GetByPortfolio(c *gin.Context) {
+	portfolioID := c.Param("id")
+
+	// Get categories for this portfolio
+	categories, err := h.repo.GetByPortfolioID(portfolioID)
+	if err != nil {
+		response.InternalError(c, "Failed to retrieve categories")
+		return
+	}
+
+	response.OK(c, "categories", categories, "Success")
 }

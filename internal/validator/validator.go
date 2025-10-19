@@ -65,6 +65,14 @@ func ValidateCategory(category *models.Category) error {
 		return err
 	}
 
+	// Validate portfolio_id is provided
+	if category.PortfolioID == 0 {
+		return ValidationError{
+			Field:   "PortfolioID",
+			Message: "Portfolio ID is required",
+		}
+	}
+
 	// Description is optional (pointer), so only validate if present
 	if category.Description != nil {
 		if err := ValidateStringLength(*category.Description, "Description", 0, 500); err != nil {

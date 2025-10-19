@@ -88,10 +88,19 @@ func (s *Server) setupRoutes() {
 }
 
 func (s *Server) healthHandler(c *gin.Context) {
+	// Check database connection
+	dbStatus := "connected"
+	sqlDB, err := s.db.DB()
+	if err != nil || sqlDB.Ping() != nil {
+		dbStatus = "disconnected"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"status":  "healthy",
-		"message": "Backend service is running",
-		"service": "portfolio-backend",
+		"status":    "healthy",
+		"message":   "Backend service is running",
+		"service":   "portfolio-backend",
+		"database":  dbStatus,
+		"timestamp": time.Now().Format(time.RFC3339),
 	})
 }
 
