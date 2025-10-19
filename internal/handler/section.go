@@ -1,12 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/repo"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/response"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,16 +28,11 @@ func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
 
 	sections, err := h.repo.GetByPortfolioIDBasic(portfolioID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve sections",
-		})
+		response.InternalError(c, "Failed to retrieve sections")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"sections": sections,
-		"message":  "Success",
-	})
+	response.OK(c, "sections", sections, "Success")
 }
 
 func (h *SectionHandler) GetByID(c *gin.Context) {
@@ -45,47 +41,33 @@ func (h *SectionHandler) GetByID(c *gin.Context) {
 	// Parse section ID
 	id, err := strconv.Atoi(sectionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid section ID",
-		})
+		response.BadRequest(c, "Invalid section ID")
 		return
 	}
 
 	section, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Section not found",
-		})
+		response.NotFound(c, "Section not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"section": section,
-		"message": "Success",
-	})
+	response.OK(c, "section", section, "Success")
 }
 
 func (h *SectionHandler) GetByType(c *gin.Context) {
 	sectionType := c.Query("type")
 	if sectionType == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Section type is required",
-		})
+		response.BadRequest(c, "Section type is required")
 		return
 	}
 
 	sections, err := h.repo.GetByType(sectionType)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve sections",
-		})
+		response.InternalError(c, "Failed to retrieve sections")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"sections": sections,
-		"message":  "Success",
-	})
+	response.OK(c, "sections", sections, "Success")
 }
 
 func (h *SectionHandler) Create(c *gin.Context) {
@@ -94,27 +76,26 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	// Parse request body
 	var newSection models.Section
 	if err := c.ShouldBindJSON(&newSection); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
 	// Set the owner
 	newSection.OwnerID = userID
 
-	// Create a section
-	if err := h.repo.Create(&newSection); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create section",
-		})
+	// Validate section data
+	if err := validator.ValidateSection(&newSection); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"section": &newSection,
-		"message": "Section created successfully",
-	})
+	// Create a section
+	if err := h.repo.Create(&newSection); err != nil {
+		response.InternalError(c, "Failed to create section")
+		return
+	}
+
+	response.Created(c, "section", &newSection, "Section created successfully")
 }
 
 func (h *SectionHandler) Update(c *gin.Context) {
@@ -124,18 +105,14 @@ func (h *SectionHandler) Update(c *gin.Context) {
 	// Parse section ID
 	id, err := strconv.Atoi(sectionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid section ID",
-		})
+		response.BadRequest(c, "Invalid section ID")
 		return
 	}
 
 	// Parse request body
 	var updateData models.Section
 	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
@@ -143,18 +120,19 @@ func (h *SectionHandler) Update(c *gin.Context) {
 	updateData.ID = uint(id)
 	updateData.OwnerID = userID
 
-	// Update section
-	if err := h.repo.Update(&updateData); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update section",
-		})
+	// Validate section data
+	if err := validator.ValidateSection(&updateData); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"section": &updateData,
-		"message": "Section updated successfully",
-	})
+	// Update section
+	if err := h.repo.Update(&updateData); err != nil {
+		response.InternalError(c, "Failed to update section")
+		return
+	}
+
+	response.OK(c, "section", &updateData, "Section updated successfully")
 }
 
 func (h *SectionHandler) Delete(c *gin.Context) {
@@ -163,36 +141,26 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(sectionID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid section ID",
-		})
+		response.BadRequest(c, "Invalid section ID")
 		return
 	}
 
 	// Get a section to check ownership
 	section, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Section not found",
-		})
+		response.NotFound(c, "Section not found")
 		return
 	}
 
 	if section.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied",
-		})
+		response.Forbidden(c, "Access denied")
 		return
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete section",
-		})
+		response.InternalError(c, "Failed to delete section")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Section deleted successfully",
-	})
+	response.OK(c, "message", "Section deleted successfully", "Success")
 }

@@ -1,12 +1,13 @@
 package handler
 
 import (
-	"net/http"
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/repo"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/response"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -27,16 +28,11 @@ func (h *ProjectHandler) GetByCategory(c *gin.Context) {
 
 	projects, err := h.repo.GetByCategoryID(categoryID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve projects",
-		})
+		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"projects": projects,
-		"message":  "Success",
-	})
+	response.OK(c, "projects", projects, "Success")
 }
 
 func (h *ProjectHandler) GetByID(c *gin.Context) {
@@ -45,24 +41,17 @@ func (h *ProjectHandler) GetByID(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid project ID",
-		})
+		response.BadRequest(c, "Invalid project ID")
 		return
 	}
 
 	project, err := h.repo.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Project not found",
-		})
+		response.NotFound(c, "Project not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"project": project,
-		"message": "Success",
-	})
+	response.OK(c, "project", project, "Success")
 }
 
 func (h *ProjectHandler) Create(c *gin.Context) {
@@ -71,27 +60,26 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Parse request body
 	var newProject models.Project
 	if err := c.ShouldBindJSON(&newProject); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
 	// Set the owner
 	newProject.OwnerID = userID
 
-	// Create a project
-	if err := h.repo.Create(&newProject); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create project",
-		})
+	// Validate project data
+	if err := validator.ValidateProject(&newProject); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"project": &newProject,
-		"message": "Project created successfully",
-	})
+	// Create a project
+	if err := h.repo.Create(&newProject); err != nil {
+		response.InternalError(c, "Failed to create project")
+		return
+	}
+
+	response.Created(c, "project", &newProject, "Project created successfully")
 }
 
 func (h *ProjectHandler) Update(c *gin.Context) {
@@ -101,18 +89,14 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid project ID",
-		})
+		response.BadRequest(c, "Invalid project ID")
 		return
 	}
 
 	// Parse request body
 	var updateData models.Project
 	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
@@ -120,18 +104,19 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	updateData.ID = uint(id)
 	updateData.OwnerID = userID
 
-	// Update project
-	if err := h.repo.Update(&updateData); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update project",
-		})
+	// Validate project data
+	if err := validator.ValidateProject(&updateData); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"project": &updateData,
-		"message": "Project updated successfully",
-	})
+	// Update project
+	if err := h.repo.Update(&updateData); err != nil {
+		response.InternalError(c, "Failed to update project")
+		return
+	}
+
+	response.OK(c, "project", &updateData, "Project updated successfully")
 }
 
 func (h *ProjectHandler) Delete(c *gin.Context) {
@@ -140,82 +125,58 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid project ID",
-		})
+		response.BadRequest(c, "Invalid project ID")
 		return
 	}
 
 	// Get a project to check ownership
 	project, err := h.repo.GetByID(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Project not found",
-		})
+		response.NotFound(c, "Project not found")
 		return
 	}
 
 	if project.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied",
-		})
+		response.Forbidden(c, "Access denied")
 		return
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete project",
-		})
+		response.InternalError(c, "Failed to delete project")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Project deleted successfully",
-	})
+	response.OK(c, "message", "Project deleted successfully", "Success")
 }
 
 func (h *ProjectHandler) GetBySkills(c *gin.Context) {
 	skills := c.QueryArray("skills")
 	if len(skills) == 0 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "At least one skill is required",
-		})
+		response.BadRequest(c, "At least one skill is required")
 		return
 	}
 
 	projects, err := h.repo.GetBySkills(skills)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve projects",
-		})
+		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"projects": projects,
-		"message":  "Success",
-	})
+	response.OK(c, "projects", projects, "Success")
 }
 
 func (h *ProjectHandler) GetByClient(c *gin.Context) {
 	client := c.Query("client")
 	if client == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Client name is required",
-		})
+		response.BadRequest(c, "Client name is required")
 		return
 	}
 
 	projects, err := h.repo.GetByClient(client)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve projects",
-		})
+		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"projects": projects,
-		"message":  "Success",
-	})
+	response.OK(c, "projects", projects, "Success")
 }

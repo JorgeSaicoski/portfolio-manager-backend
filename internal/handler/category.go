@@ -7,6 +7,8 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/repo"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/response"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,18 +46,11 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 
 	categories, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to retrieve categories",
-		})
+		response.InternalError(c, "Failed to retrieve categories")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"categories": categories,
-		"page":       page,
-		"limit":      limit,
-		"message":    "Success",
-	})
+	response.SuccessWithPagination(c, http.StatusOK, "categories", categories, page, limit)
 }
 func (h *CategoryHandler) Update(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
@@ -64,18 +59,14 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	// Parse category ID
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid category ID",
-		})
+		response.BadRequest(c, "Invalid category ID")
 		return
 	}
 
 	// Parse request body
 	var updateData models.Category
 	if err := c.ShouldBindJSON(&updateData); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
@@ -83,18 +74,19 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	updateData.ID = uint(id)
 	updateData.OwnerID = userID
 
-	// Update category
-	if err := h.repo.Update(&updateData); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to update category",
-		})
+	// Validate category data
+	if err := validator.ValidateCategory(&updateData); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"category": &updateData,
-		"message":  "Category updated successfully",
-	})
+	// Update category
+	if err := h.repo.Update(&updateData); err != nil {
+		response.InternalError(c, "Failed to update category")
+		return
+	}
+
+	response.OK(c, "category", &updateData, "Category updated successfully")
 }
 
 func (h *CategoryHandler) Create(c *gin.Context) {
@@ -103,27 +95,26 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	// Parse request body
 	var newCategory models.Category
 	if err := c.ShouldBindJSON(&newCategory); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid request data",
-		})
+		response.BadRequest(c, "Invalid request data")
 		return
 	}
 
 	// Set the owner
 	newCategory.OwnerID = userID
 
-	// Create category
-	if err := h.repo.Create(&newCategory); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to create category",
-		})
+	// Validate category data
+	if err := validator.ValidateCategory(&newCategory); err != nil {
+		response.BadRequest(c, err.Error())
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{
-		"category": &newCategory,
-		"message":  "Category created successfully",
-	})
+	// Create category
+	if err := h.repo.Create(&newCategory); err != nil {
+		response.InternalError(c, "Failed to create category")
+		return
+	}
+
+	response.Created(c, "category", &newCategory, "Category created successfully")
 }
 
 func (h *CategoryHandler) Delete(c *gin.Context) {
@@ -132,38 +123,28 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid category ID",
-		})
+		response.BadRequest(c, "Invalid category ID")
 		return
 	}
 
 	// Use basic method - only fetch id and owner_id for authorization
 	category, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Category not found",
-		})
+		response.NotFound(c, "Category not found")
 		return
 	}
 
 	if category.OwnerID != userID {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "Access denied",
-		})
+		response.Forbidden(c, "Access denied")
 		return
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to delete category",
-		})
+		response.InternalError(c, "Failed to delete category")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"message": "Category deleted successfully",
-	})
+	response.OK(c, "message", "Category deleted successfully", "Success")
 }
 
 func (h *CategoryHandler) GetByIDPublic(c *gin.Context) {
@@ -172,23 +153,16 @@ func (h *CategoryHandler) GetByIDPublic(c *gin.Context) {
 	// Parse category ID
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Invalid category ID",
-		})
+		response.BadRequest(c, "Invalid category ID")
 		return
 	}
 
 	// Get complete category with relationships
 	category, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Category not found",
-		})
+		response.NotFound(c, "Category not found")
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"category": category,
-		"message":  "Success",
-	})
+	response.OK(c, "category", category, "Success")
 }

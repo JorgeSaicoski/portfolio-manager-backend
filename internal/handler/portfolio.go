@@ -6,10 +6,11 @@ import (
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto/request"
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto/response"
+	dtoresponse "github.com/JorgeSaicoski/portfolio-manager/backend/internal/dto/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/repo"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/validator"
 	"github.com/gin-gonic/gin"
 )
 
@@ -46,7 +47,7 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dto.PaginatedResponse{
-		Data:    response.ToPortfolioListResponse(portfolios),
+		Data:    dtoresponse.ToPortfolioListResponse(portfolios),
 		Page:    page,
 		Limit:   limit,
 		Message: "Success",
@@ -82,6 +83,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	}
 	updateData.ID = uint(id)
 
+	// Validate portfolio data
+	if err := validator.ValidatePortfolio(&updateData); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: err.Error(),
+		})
+		return
+	}
+
 	// Update portfolio
 	if err := h.repo.Update(&updateData); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -92,7 +101,7 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Message: "Portfolio updated successfully",
-		Data:    response.ToPortfolioResponse(&updateData),
+		Data:    dtoresponse.ToPortfolioResponse(&updateData),
 	})
 }
 
@@ -115,6 +124,14 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 		OwnerID:     userID,
 	}
 
+	// Validate portfolio data
+	if err := validator.ValidatePortfolio(&newPortfolio); err != nil {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: err.Error(),
+		})
+		return
+	}
+
 	// Create portfolio
 	if err := h.repo.Create(&newPortfolio); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -125,7 +142,7 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse{
 		Message: "Portfolio created successfully",
-		Data:    response.ToPortfolioResponse(&newPortfolio),
+		Data:    dtoresponse.ToPortfolioResponse(&newPortfolio),
 	})
 }
 
@@ -192,6 +209,6 @@ func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Message: "Success",
-		Data:    response.ToPortfolioDetailResponse(portfolio),
+		Data:    dtoresponse.ToPortfolioDetailResponse(portfolio),
 	})
 }
