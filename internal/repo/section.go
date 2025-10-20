@@ -19,8 +19,8 @@ func (r *sectionRepository) Create(section *models.Section) error {
 	return r.db.Create(section).Error
 }
 
-// GetByOwnerIDBasic For list views - only basic section info for a specific owner
-func (r *sectionRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Section, error) {
+// GetByOwnerID For list views - only basic section info for a specific owner
+func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]*models.Section, error) {
 	var sections []*models.Section
 	err := r.db.Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
@@ -29,28 +29,18 @@ func (r *sectionRepository) GetByOwnerIDBasic(ownerID string, limit, offset int)
 	return sections, err
 }
 
-// For list views - only basic portfolio info
-func (r *sectionRepository) GetByPortfolioIDBasic(portfolioID string) ([]*models.Section, error) {
-	var sections []*models.Section
-	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
-		Where("portfolio_id = ?", portfolioID).
-		Order("position ASC, created_at ASC").
-		Find(&sections).Error
-	return sections, err
-}
-
-// For detail views - with relationships using JOIN
-func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, error) {
+// For detail views - basic section info
+func (r *sectionRepository) GetByID(id uint) (*models.Section, error) {
 	var section models.Section
-	err := r.db.Preload("Portfolio").
-		Where("id = ?", id).
+	err := r.db.Where("id = ?", id).
 		First(&section).Error
 	return &section, err
 }
 
-func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error) {
+// For list views - only basic portfolio info
+func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]*models.Section, error) {
 	var sections []*models.Section
-	err := r.db.Preload("Portfolio").
+	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
 		Find(&sections).Error

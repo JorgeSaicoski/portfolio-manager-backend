@@ -23,4 +23,5 @@ func (r *Router) RegisterPortfolioRoutes(apiGroup *gin.RouterGroup) {
 	portfolios.GET("/id/:id", r.portfolioHandler.GetByIDPublic)
 	portfolios.GET("/public/:id", r.portfolioHandler.GetByIDPublic)
 	portfolios.GET("/public/:id/categories", r.categoryHandler.GetByPortfolio)
+	portfolios.GET("/public/:id/sections", r.sectionHandler.GetByPortfolio)
 }

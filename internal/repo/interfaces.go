@@ -31,10 +31,9 @@ type ProjectRepository interface {
 
 type SectionRepository interface {
 	Create(section *models.Section) error
-	GetByIDWithRelations(id uint) (*models.Section, error)
-	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Section, error)
-	GetByPortfolioIDBasic(portfolioID string) ([]*models.Section, error)
-	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error)
+	GetByID(id uint) (*models.Section, error)
+	GetByOwnerID(ownerID string, limit, offset int) ([]*models.Section, error)
+	GetByPortfolioID(portfolioID string) ([]*models.Section, error)
 	GetByType(sectionType string) ([]*models.Section, error)
 	Update(section *models.Section) error
 	UpdatePosition(id uint, position uint) error

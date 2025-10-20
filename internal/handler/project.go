@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
@@ -118,6 +119,12 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 
 	// Create a project
 	if err := h.repo.Create(&newProject); err != nil {
+		// Check if error is due to foreign key constraint (invalid category_id)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "fk_categories_projects") || strings.Contains(errMsg, "23503") {
+			response.NotFound(c, "Category not found")
+			return
+		}
 		response.InternalError(c, "Failed to create project")
 		return
 	}
@@ -177,6 +184,12 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 
 	// Update project
 	if err := h.repo.Update(&updateData); err != nil {
+		// Check if error is due to foreign key constraint (invalid category_id)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "fk_categories_projects") || strings.Contains(errMsg, "23503") {
+			response.NotFound(c, "Category not found")
+			return
+		}
 		response.InternalError(c, "Failed to update project")
 		return
 	}

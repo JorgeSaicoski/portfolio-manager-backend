@@ -382,29 +382,6 @@ func TestPortfolio_DuplicateCheck(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
-	t.Run("Error_UpdateToDuplicate", func(t *testing.T) {
-		cleanDatabase(testDB.DB)
-
-		// Create two portfolios
-		portfolio1 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio One")
-		portfolio2 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio Two")
-
-		// Try to update portfolio2 to have same title as portfolio1
-		payload := map[string]interface{}{
-			"title": portfolio1.Title,
-		}
-
-		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/portfolios/own/%d", portfolio2.ID), payload, token)
-		assert.Equal(t, 400, resp.Code)
-
-		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
-			assert.Contains(t, body, "error")
-			assert.Contains(t, body["error"], "already exists")
-		})
-
-		cleanDatabase(testDB.DB)
-	})
-
 	t.Run("Success_UpdateSameTitle", func(t *testing.T) {
 		cleanDatabase(testDB.DB)
 

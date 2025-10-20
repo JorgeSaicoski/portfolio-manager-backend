@@ -2,6 +2,7 @@ package handler
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
@@ -42,7 +43,7 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	sections, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	sections, err := h.repo.GetByOwnerID(userID, limit, offset)
 	if err != nil {
 		response.InternalError(c, "Failed to retrieve sections")
 		return
@@ -52,9 +53,9 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
-	portfolioID := c.Param("portfolioId")
+	portfolioID := c.Param("id")
 
-	sections, err := h.repo.GetByPortfolioIDBasic(portfolioID)
+	sections, err := h.repo.GetByPortfolioID(portfolioID)
 	if err != nil {
 		response.InternalError(c, "Failed to retrieve sections")
 		return
@@ -73,7 +74,7 @@ func (h *SectionHandler) GetByID(c *gin.Context) {
 		return
 	}
 
-	section, err := h.repo.GetByIDWithRelations(uint(id))
+	section, err := h.repo.GetByID(uint(id))
 	if err != nil {
 		response.NotFound(c, "Section not found")
 		return
@@ -130,6 +131,12 @@ func (h *SectionHandler) Create(c *gin.Context) {
 
 	// Create a section
 	if err := h.repo.Create(&newSection); err != nil {
+		// Check if error is due to foreign key constraint (invalid portfolio_id)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "fk_portfolios_sections") || strings.Contains(errMsg, "23503") {
+			response.NotFound(c, "Portfolio not found")
+			return
+		}
 		response.InternalError(c, "Failed to create section")
 		return
 	}
@@ -165,6 +172,17 @@ func (h *SectionHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Check if section exists and belongs to user
+	existing, err := h.repo.GetByID(uint(id))
+	if err != nil {
+		response.NotFound(c, "Section not found")
+		return
+	}
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.PortfolioID, updateData.ID)
 	if err != nil {
@@ -178,6 +196,12 @@ func (h *SectionHandler) Update(c *gin.Context) {
 
 	// Update section
 	if err := h.repo.Update(&updateData); err != nil {
+		// Check if error is due to foreign key constraint (invalid portfolio_id)
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "fk_portfolios_sections") || strings.Contains(errMsg, "23503") {
+			response.NotFound(c, "Portfolio not found")
+			return
+		}
 		response.InternalError(c, "Failed to update section")
 		return
 	}
@@ -196,7 +220,7 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 	}
 
 	// Get a section to check ownership
-	section, err := h.repo.GetByIDWithRelations(uint(id))
+	section, err := h.repo.GetByID(uint(id))
 	if err != nil {
 		response.NotFound(c, "Section not found")
 		return
@@ -236,8 +260,8 @@ func (h *SectionHandler) UpdatePosition(c *gin.Context) {
 		return
 	}
 
-	// Check if section exists and belongs to user
-	existing, err := h.repo.GetByIDWithRelations(uint(id))
+	// Check if the section exists and belongs to a user
+	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
 		response.NotFound(c, "Section not found")
 		return

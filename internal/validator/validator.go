@@ -52,6 +52,14 @@ func ValidateProject(project *models.Project) error {
 		return err
 	}
 
+	// Validate category_id is provided
+	if project.CategoryID == 0 {
+		return ValidationError{
+			Field:   "CategoryID",
+			Message: "Category ID is required",
+		}
+	}
+
 	// Add more validations as needed
 	// For example: link format, client name, etc.
 
@@ -93,6 +101,14 @@ func ValidateSection(section *models.Section) error {
 	// Validate type
 	if err := ValidateStringLength(section.Type, "Type", 1, 50); err != nil {
 		return err
+	}
+
+	// Validate portfolio_id is provided
+	if section.PortfolioID == 0 {
+		return ValidationError{
+			Field:   "PortfolioID",
+			Message: "Portfolio ID is required",
+		}
 	}
 
 	// Description is optional (pointer), so only validate if present
