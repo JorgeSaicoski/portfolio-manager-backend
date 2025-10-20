@@ -540,3 +540,109 @@ func TestProject_GetByCategory(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 }
+
+// TestProject_DuplicateCheck tests duplicate title validation within same category
+func TestProject_DuplicateCheck(t *testing.T) {
+	token := GetTestAuthToken()
+	userID := GetTestUserID()
+
+	t.Run("Error_CreateDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+
+		// Create first project
+		CreateTestProjectWithTitle(testDB.DB, category.ID, userID, "E-commerce Platform")
+
+		// Try to create second project with same title in same category
+		payload := map[string]interface{}{
+			"title":       "E-commerce Platform",
+			"description": "Another e-commerce project",
+			"category_id": category.ID,
+		}
+
+		resp := MakeRequest(t, "POST", "/api/projects/own", payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_CreateSameTitleDifferentCategory", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category1 := CreateTestCategoryWithTitle(testDB.DB, portfolio.ID, userID, "Web Development")
+		category2 := CreateTestCategoryWithTitle(testDB.DB, portfolio.ID, userID, "Mobile Development")
+
+		// Create project in first category
+		CreateTestProjectWithTitle(testDB.DB, category1.ID, userID, "E-commerce Platform")
+
+		// Create project with same title but in different category - should succeed
+		payload := map[string]interface{}{
+			"title":       "E-commerce Platform",
+			"description": "Mobile version",
+			"category_id": category2.ID,
+		}
+
+		resp := MakeRequest(t, "POST", "/api/projects/own", payload, token)
+		assert.Equal(t, 201, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Error_UpdateToDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+
+		// Create two projects
+		project1 := CreateTestProjectWithTitle(testDB.DB, category.ID, userID, "Project One")
+		project2 := CreateTestProjectWithTitle(testDB.DB, category.ID, userID, "Project Two")
+
+		// Try to update project2 to have same title as project1
+		payload := map[string]interface{}{
+			"title":       project1.Title,
+			"description": "Updated description",
+			"category_id": category.ID,
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/projects/own/%d", project2.ID), payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_UpdateSameTitle", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+
+		// Create project
+		project := CreateTestProjectWithTitle(testDB.DB, category.ID, userID, "My Project")
+
+		// Update with same title but different description - should succeed
+		payload := map[string]interface{}{
+			"title":       "My Project",
+			"description": "Updated description",
+			"category_id": category.ID,
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/projects/own/%d", project.ID), payload, token)
+		assert.Equal(t, 200, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+}

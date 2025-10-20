@@ -198,3 +198,45 @@ func (h *CategoryHandler) GetByPortfolio(c *gin.Context) {
 
 	response.OK(c, "categories", categories, "Success")
 }
+
+// UpdatePosition updates the position field of a category
+func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
+	userID := c.GetString("userID") // From auth middleware
+	categoryID := c.Param("id")
+
+	// Parse category ID
+	id, err := strconv.Atoi(categoryID)
+	if err != nil {
+		response.BadRequest(c, "Invalid category ID")
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Position uint `json:"position" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request data")
+		return
+	}
+
+	// Check if category exists and belongs to user
+	existing, err := h.repo.GetByIDBasic(uint(id))
+	if err != nil {
+		response.NotFound(c, "Category not found")
+		return
+	}
+
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
+	// Update position
+	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
+		response.InternalError(c, "Failed to update category position")
+		return
+	}
+
+	response.OK(c, "message", "Category position updated successfully", "Success")
+}

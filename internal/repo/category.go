@@ -49,8 +49,9 @@ func (r *categoryRepository) GetByIDWithRelations(id uint) (*models.Category, er
 // GetByPortfolioID For list views - only basic category info
 func (r *categoryRepository) GetByPortfolioID(portfolioID string) ([]*models.Category, error) {
 	var categories []*models.Category
-	err := r.db.Select("id, title, description, owner_id, portfolio_id, created_at, updated_at").
+	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
+		Order("position ASC, created_at ASC").
 		Find(&categories).Error
 	return categories, err
 }
@@ -58,14 +59,22 @@ func (r *categoryRepository) GetByPortfolioID(portfolioID string) ([]*models.Cat
 // GetByPortfolioIDWithRelations For detail views - with projects preloaded
 func (r *categoryRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Category, error) {
 	var categories []*models.Category
-	err := r.db.Preload("Projects").
+	err := r.db.Preload("Projects", func(db *gorm.DB) *gorm.DB {
+		return db.Order("projects.position ASC, projects.created_at ASC")
+	}).
 		Where("portfolio_id = ?", portfolioID).
+		Order("position ASC, created_at ASC").
 		Find(&categories).Error
 	return categories, err
 }
 
 func (r *categoryRepository) Update(category *models.Category) error {
 	return r.db.Model(category).Where("id = ?", category.ID).Updates(category).Error
+}
+
+// UpdatePosition updates only the position field of a category
+func (r *categoryRepository) UpdatePosition(id uint, position uint) error {
+	return r.db.Model(&models.Category{}).Where("id = ?", id).Update("position", position).Error
 }
 
 func (r *categoryRepository) Delete(id uint) error {

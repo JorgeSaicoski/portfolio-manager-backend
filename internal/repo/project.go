@@ -31,6 +31,7 @@ func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Project, error) {
 	var projects []*models.Project
 	err := r.db.Where("owner_id = ?", ownerID).
+		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&projects).Error
 	return projects, err
@@ -40,12 +41,18 @@ func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int)
 func (r *projectRepository) GetByCategoryID(categoryID string) ([]*models.Project, error) {
 	var projects []*models.Project
 	err := r.db.Where("category_id = ?", categoryID).
+		Order("position ASC, created_at ASC").
 		Find(&projects).Error
 	return projects, err
 }
 
 func (r *projectRepository) Update(project *models.Project) error {
 	return r.db.Model(project).Where("id = ?", project.ID).Updates(project).Error
+}
+
+// UpdatePosition updates only the position field of a project
+func (r *projectRepository) UpdatePosition(id uint, position uint) error {
+	return r.db.Model(&models.Project{}).Where("id = ?", id).Update("position", position).Error
 }
 
 func (r *projectRepository) Delete(id uint) error {

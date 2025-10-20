@@ -16,7 +16,9 @@ func (a *StringArray) Scan(value interface{}) error {
 		*a = []string{}
 		return nil
 	}
-	return pq.Array(a).Scan(value)
+	// Convert *StringArray to *[]string explicitly for pq.Array
+	arr := (*[]string)(a)
+	return pq.Array(arr).Scan(value)
 }
 
 // Value implements the driver.Valuer interface
@@ -24,7 +26,9 @@ func (a StringArray) Value() (driver.Value, error) {
 	if a == nil {
 		return pq.Array([]string{}).Value()
 	}
-	return pq.Array(a).Value()
+	// Convert StringArray to []string explicitly for clarity
+	arr := ([]string)(a)
+	return pq.Array(arr).Value()
 }
 
 type Project struct {
@@ -36,7 +40,7 @@ type Project struct {
 	Skills      StringArray `json:"skills" gorm:"type:text[]"`
 	Client      string      `json:"client"`
 	Link        string      `json:"link"`
-	Position    uint        `json:"position"` // Todo Implement this
+	Position    uint        `json:"position" gorm:"default:0"`
 	OwnerID     string      `json:"ownerId,omitempty"`
 	CategoryID  uint        `json:"category_id"`
 }

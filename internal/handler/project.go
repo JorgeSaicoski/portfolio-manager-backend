@@ -153,6 +153,17 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Check if project exists and belongs to user
+	existing, err := h.repo.GetByID(uint(id))
+	if err != nil {
+		response.NotFound(c, "Project not found")
+		return
+	}
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.CategoryID, updateData.ID)
 	if err != nil {
@@ -252,4 +263,46 @@ func (h *ProjectHandler) GetByIDPublic(c *gin.Context) {
 	}
 
 	response.OK(c, "project", project, "Success")
+}
+
+// UpdatePosition updates the position field of a project
+func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
+	userID := c.GetString("userID") // From auth middleware
+	projectID := c.Param("id")
+
+	// Parse project ID
+	id, err := strconv.Atoi(projectID)
+	if err != nil {
+		response.BadRequest(c, "Invalid project ID")
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Position uint `json:"position" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request data")
+		return
+	}
+
+	// Check if project exists and belongs to user
+	existing, err := h.repo.GetByID(uint(id))
+	if err != nil {
+		response.NotFound(c, "Project not found")
+		return
+	}
+
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
+	// Update position
+	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
+		response.InternalError(c, "Failed to update project position")
+		return
+	}
+
+	response.OK(c, "message", "Project position updated successfully", "Success")
 }

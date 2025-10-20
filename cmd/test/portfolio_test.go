@@ -391,7 +391,7 @@ func TestPortfolio_DuplicateCheck(t *testing.T) {
 
 		// Try to update portfolio2 to have same title as portfolio1
 		payload := map[string]interface{}{
-			"title": "Portfolio One",
+			"title": portfolio1.Title,
 		}
 
 		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/portfolios/own/%d", portfolio2.ID), payload, token)

@@ -7,14 +7,20 @@ import (
 
 func (r *Router) RegisterSectionRoutes(apiGroup *gin.RouterGroup) {
 	sections := apiGroup.Group("/sections")
-	sections.Use(middleware.AuthMiddleware())
+
+	// Protected routes - require authentication
+	protected := sections.Group("/own")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		sections.POST("/", r.sectionHandler.Create)
-		sections.PUT("/id/:id", r.sectionHandler.Update)
-		sections.DELETE("/id/:id", r.sectionHandler.Delete)
+		protected.GET("", r.sectionHandler.GetByUser)
+		protected.POST("", r.sectionHandler.Create)
+		protected.GET("/:id", r.sectionHandler.GetByID)
+		protected.PUT("/:id", r.sectionHandler.Update)
+		protected.DELETE("/:id", r.sectionHandler.Delete)
 	}
+
 	// Public routes - no auth required
-	apiGroup.GET("/sections/id/:id", r.sectionHandler.GetByID)
-	apiGroup.GET("/sections/portfolio/:portfolioId", r.sectionHandler.GetByPortfolio)
-	apiGroup.GET("/sections/type", r.sectionHandler.GetByType)
+	sections.GET("/public/:id", r.sectionHandler.GetByID)
+	sections.GET("/portfolio/:portfolioId", r.sectionHandler.GetByPortfolio)
+	sections.GET("/type", r.sectionHandler.GetByType)
 }

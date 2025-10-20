@@ -19,11 +19,22 @@ func (r *sectionRepository) Create(section *models.Section) error {
 	return r.db.Create(section).Error
 }
 
+// GetByOwnerIDBasic For list views - only basic section info for a specific owner
+func (r *sectionRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Section, error) {
+	var sections []*models.Section
+	err := r.db.Where("owner_id = ?", ownerID).
+		Order("position ASC, created_at ASC").
+		Limit(limit).Offset(offset).
+		Find(&sections).Error
+	return sections, err
+}
+
 // For list views - only basic portfolio info
 func (r *sectionRepository) GetByPortfolioIDBasic(portfolioID string) ([]*models.Section, error) {
 	var sections []*models.Section
-	err := r.db.Select("id, title, owner_id, created_at, updated_at").
+	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
+		Order("position ASC, created_at ASC").
 		Find(&sections).Error
 	return sections, err
 }
@@ -41,6 +52,7 @@ func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([
 	var sections []*models.Section
 	err := r.db.Preload("Portfolio").
 		Where("portfolio_id = ?", portfolioID).
+		Order("position ASC, created_at ASC").
 		Find(&sections).Error
 	return sections, err
 }
@@ -54,6 +66,11 @@ func (r *sectionRepository) GetByType(sectionType string) ([]*models.Section, er
 
 func (r *sectionRepository) Update(section *models.Section) error {
 	return r.db.Model(section).Where("id = ?", section.ID).Updates(section).Error
+}
+
+// UpdatePosition updates only the position field of a section
+func (r *sectionRepository) UpdatePosition(id uint, position uint) error {
+	return r.db.Model(&models.Section{}).Where("id = ?", id).Update("position", position).Error
 }
 
 func (r *sectionRepository) Delete(id uint) error {

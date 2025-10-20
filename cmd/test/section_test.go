@@ -537,3 +537,109 @@ func TestSection_GetByPortfolio(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 }
+
+// TestSection_DuplicateCheck tests duplicate title validation within same portfolio
+func TestSection_DuplicateCheck(t *testing.T) {
+	token := GetTestAuthToken()
+	userID := GetTestUserID()
+
+	t.Run("Error_CreateDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+
+		// Create first section
+		CreateTestSectionWithTitle(testDB.DB, portfolio.ID, userID, "About Me")
+
+		// Try to create second section with same title in same portfolio
+		payload := map[string]interface{}{
+			"title":        "About Me",
+			"description":  "Another about section",
+			"type":         "text",
+			"portfolio_id": portfolio.ID,
+		}
+
+		resp := MakeRequest(t, "POST", "/api/sections/own", payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_CreateSameTitleDifferentPortfolio", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio1 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio 1")
+		portfolio2 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio 2")
+
+		// Create section in first portfolio
+		CreateTestSectionWithTitle(testDB.DB, portfolio1.ID, userID, "About Me")
+
+		// Create section with same title but in different portfolio - should succeed
+		payload := map[string]interface{}{
+			"title":        "About Me",
+			"description":  "About section for portfolio 2",
+			"type":         "text",
+			"portfolio_id": portfolio2.ID,
+		}
+
+		resp := MakeRequest(t, "POST", "/api/sections/own", payload, token)
+		assert.Equal(t, 201, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Error_UpdateToDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+
+		// Create two sections
+		section1 := CreateTestSectionWithTitle(testDB.DB, portfolio.ID, userID, "Section One")
+		section2 := CreateTestSectionWithTitle(testDB.DB, portfolio.ID, userID, "Section Two")
+
+		// Try to update section2 to have same title as section1
+		payload := map[string]interface{}{
+			"title":        section1.Title,
+			"description":  "Updated description",
+			"type":         "text",
+			"portfolio_id": portfolio.ID,
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/sections/own/%d", section2.ID), payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_UpdateSameTitle", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+
+		// Create section
+		section := CreateTestSectionWithTitle(testDB.DB, portfolio.ID, userID, "My Section")
+
+		// Update with same title but different description - should succeed
+		payload := map[string]interface{}{
+			"title":        "My Section",
+			"description":  "Updated description",
+			"type":         "text",
+			"portfolio_id": portfolio.ID,
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/sections/own/%d", section.ID), payload, token)
+		assert.Equal(t, 200, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+}

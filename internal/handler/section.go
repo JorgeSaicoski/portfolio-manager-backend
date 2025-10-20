@@ -23,6 +23,34 @@ func NewSectionHandler(repo repo.SectionRepository, metrics *metrics.Collector) 
 	}
 }
 
+func (h *SectionHandler) GetByUser(c *gin.Context) {
+	userID := c.GetString("userID") // From auth middleware
+
+	// Parse pagination parameters - using default values if not provided
+	page := 1
+	limit := 10
+	if pageParam := c.Query("page"); pageParam != "" {
+		if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if limitParam := c.Query("limit"); limitParam != "" {
+		if l, err := strconv.Atoi(limitParam); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	sections, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	if err != nil {
+		response.InternalError(c, "Failed to retrieve sections")
+		return
+	}
+
+	response.SuccessWithPagination(c, 200, "sections", sections, page, limit)
+}
+
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
 	portfolioID := c.Param("portfolioId")
 
@@ -185,4 +213,46 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 	}
 
 	response.OK(c, "message", "Section deleted successfully", "Success")
+}
+
+// UpdatePosition updates the position field of a section
+func (h *SectionHandler) UpdatePosition(c *gin.Context) {
+	userID := c.GetString("userID") // From auth middleware
+	sectionID := c.Param("id")
+
+	// Parse section ID
+	id, err := strconv.Atoi(sectionID)
+	if err != nil {
+		response.BadRequest(c, "Invalid section ID")
+		return
+	}
+
+	// Parse request body
+	var req struct {
+		Position uint `json:"position" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request data")
+		return
+	}
+
+	// Check if section exists and belongs to user
+	existing, err := h.repo.GetByIDWithRelations(uint(id))
+	if err != nil {
+		response.NotFound(c, "Section not found")
+		return
+	}
+
+	if existing.OwnerID != userID {
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
+	// Update position
+	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
+		response.InternalError(c, "Failed to update section position")
+		return
+	}
+
+	response.OK(c, "message", "Section position updated successfully", "Success")
 }

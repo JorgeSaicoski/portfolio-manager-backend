@@ -21,6 +21,7 @@ type ProjectRepository interface {
 	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Project, error)
 	GetByCategoryID(categoryID string) ([]*models.Project, error)
 	Update(project *models.Project) error
+	UpdatePosition(id uint, position uint) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Project, error)
 	GetBySkills(skills []string) ([]*models.Project, error)
@@ -31,10 +32,12 @@ type ProjectRepository interface {
 type SectionRepository interface {
 	Create(section *models.Section) error
 	GetByIDWithRelations(id uint) (*models.Section, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Section, error)
 	GetByPortfolioIDBasic(portfolioID string) ([]*models.Section, error)
 	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error)
 	GetByType(sectionType string) ([]*models.Section, error)
 	Update(section *models.Section) error
+	UpdatePosition(id uint, position uint) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Section, error)
 	CheckDuplicate(title string, portfolioID uint, id uint) (bool, error)
@@ -49,6 +52,7 @@ type CategoryRepository interface {
 	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Category, error)
 	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Category, error)
 	Update(category *models.Category) error
+	UpdatePosition(id uint, position uint) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Category, error)
 }
