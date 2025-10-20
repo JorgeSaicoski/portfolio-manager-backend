@@ -89,6 +89,17 @@ func (h *SectionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(newSection.Title, newSection.PortfolioID, 0)
+	if err != nil {
+		response.InternalError(c, "Failed to check for duplicate section")
+		return
+	}
+	if isDuplicate {
+		response.BadRequest(c, "Section with this title already exists in this portfolio")
+		return
+	}
+
 	// Create a section
 	if err := h.repo.Create(&newSection); err != nil {
 		response.InternalError(c, "Failed to create section")
@@ -123,6 +134,17 @@ func (h *SectionHandler) Update(c *gin.Context) {
 	// Validate section data
 	if err := validator.ValidateSection(&updateData); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.PortfolioID, updateData.ID)
+	if err != nil {
+		response.InternalError(c, "Failed to check for duplicate section")
+		return
+	}
+	if isDuplicate {
+		response.BadRequest(c, "Section with this title already exists in this portfolio")
 		return
 	}
 

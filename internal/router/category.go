@@ -22,4 +22,5 @@ func (r *Router) RegisterCategoryRoutes(apiGroup *gin.RouterGroup) {
 	// Public routes - no auth required
 	categories.GET("/id/:id", r.categoryHandler.GetByIDPublic)
 	categories.GET("/public/:id", r.categoryHandler.GetByIDPublic)
+	categories.GET("/public/:id/projects", r.projectHandler.GetByCategory)
 }

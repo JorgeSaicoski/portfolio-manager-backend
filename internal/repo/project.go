@@ -27,6 +27,15 @@ func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 	return &project, err
 }
 
+// GetByOwnerIDBasic For list views - only basic project info for a specific owner
+func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Project, error) {
+	var projects []*models.Project
+	err := r.db.Where("owner_id = ?", ownerID).
+		Limit(limit).Offset(offset).
+		Find(&projects).Error
+	return projects, err
+}
+
 // GetByCategoryID For list views - projects in a category
 func (r *projectRepository) GetByCategoryID(categoryID string) ([]*models.Project, error) {
 	var projects []*models.Project

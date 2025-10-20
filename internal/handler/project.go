@@ -23,8 +23,40 @@ func NewProjectHandler(repo repo.ProjectRepository, metrics *metrics.Collector) 
 	}
 }
 
+func (h *ProjectHandler) GetByUser(c *gin.Context) {
+	userID := c.GetString("userID") // From auth middleware
+
+	// Parse pagination parameters - using default values if not provided
+	page := 1
+	limit := 10
+	if pageParam := c.Query("page"); pageParam != "" {
+		if p, err := strconv.Atoi(pageParam); err == nil && p > 0 {
+			page = p
+		}
+	}
+	if limitParam := c.Query("limit"); limitParam != "" {
+		if l, err := strconv.Atoi(limitParam); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	offset := (page - 1) * limit
+
+	projects, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	if err != nil {
+		response.InternalError(c, "Failed to retrieve projects")
+		return
+	}
+
+	response.SuccessWithPagination(c, 200, "projects", projects, page, limit)
+}
+
 func (h *ProjectHandler) GetByCategory(c *gin.Context) {
+	// Try both parameter names for flexibility
 	categoryID := c.Param("categoryId")
+	if categoryID == "" {
+		categoryID = c.Param("id")
+	}
 
 	projects, err := h.repo.GetByCategoryID(categoryID)
 	if err != nil {
@@ -73,6 +105,17 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(newProject.Title, newProject.CategoryID, 0)
+	if err != nil {
+		response.InternalError(c, "Failed to check for duplicate project")
+		return
+	}
+	if isDuplicate {
+		response.BadRequest(c, "Project with this title already exists in this category")
+		return
+	}
+
 	// Create a project
 	if err := h.repo.Create(&newProject); err != nil {
 		response.InternalError(c, "Failed to create project")
@@ -107,6 +150,17 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Validate project data
 	if err := validator.ValidateProject(&updateData); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.CategoryID, updateData.ID)
+	if err != nil {
+		response.InternalError(c, "Failed to check for duplicate project")
+		return
+	}
+	if isDuplicate {
+		response.BadRequest(c, "Project with this title already exists in this category")
 		return
 	}
 
@@ -179,4 +233,23 @@ func (h *ProjectHandler) GetByClient(c *gin.Context) {
 	}
 
 	response.OK(c, "projects", projects, "Success")
+}
+
+func (h *ProjectHandler) GetByIDPublic(c *gin.Context) {
+	projectID := c.Param("id")
+
+	// Parse project ID
+	id, err := strconv.Atoi(projectID)
+	if err != nil {
+		response.BadRequest(c, "Invalid project ID")
+		return
+	}
+
+	project, err := h.repo.GetByID(uint(id))
+	if err != nil {
+		response.NotFound(c, "Project not found")
+		return
+	}
+
+	response.OK(c, "project", project, "Success")
 }

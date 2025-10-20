@@ -7,15 +7,21 @@ import (
 
 func (r *Router) RegisterProjectRoutes(apiGroup *gin.RouterGroup) {
 	projects := apiGroup.Group("/projects")
-	projects.Use(middleware.AuthMiddleware())
+
+	// Protected routes - require authentication
+	protected := projects.Group("/own")
+	protected.Use(middleware.AuthMiddleware())
 	{
-		projects.POST("/", r.projectHandler.Create)
-		projects.PUT("/id/:id", r.projectHandler.Update)
-		projects.DELETE("/id/:id", r.projectHandler.Delete)
+		protected.GET("", r.projectHandler.GetByUser)
+		protected.POST("", r.projectHandler.Create)
+		protected.GET("/:id", r.projectHandler.GetByID)
+		protected.PUT("/:id", r.projectHandler.Update)
+		protected.DELETE("/:id", r.projectHandler.Delete)
 	}
+
 	// Public routes - no auth required
-	apiGroup.GET("/projects/id/:id", r.projectHandler.GetByID)
-	apiGroup.GET("/projects/category/:categoryId", r.projectHandler.GetByCategory)
-	apiGroup.GET("/projects/search/skills", r.projectHandler.GetBySkills)
-	apiGroup.GET("/projects/search/client", r.projectHandler.GetByClient)
+	projects.GET("/public/:id", r.projectHandler.GetByIDPublic)
+	projects.GET("/category/:categoryId", r.projectHandler.GetByCategory)
+	projects.GET("/search/skills", r.projectHandler.GetBySkills)
+	projects.GET("/search/client", r.projectHandler.GetByClient)
 }

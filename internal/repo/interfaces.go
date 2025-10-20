@@ -18,6 +18,7 @@ type PortfolioRepository interface {
 type ProjectRepository interface {
 	Create(project *models.Project) error
 	GetByID(id uint) (*models.Project, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Project, error)
 	GetByCategoryID(categoryID string) ([]*models.Project, error)
 	Update(project *models.Project) error
 	Delete(id uint) error

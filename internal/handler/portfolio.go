@@ -91,6 +91,21 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Check if portfolio exists and belongs to user
+	existing, err := h.repo.GetByIDBasic(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, dto.ErrorResponse{
+			Error: "Portfolio not found",
+		})
+		return
+	}
+	if existing.OwnerID != userID {
+		c.JSON(http.StatusForbidden, dto.ErrorResponse{
+			Error: "Access denied",
+		})
+		return
+	}
+
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.OwnerID, updateData.ID)
 	if err != nil {

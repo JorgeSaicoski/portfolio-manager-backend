@@ -335,3 +335,91 @@ func TestPortfolio_GetPublic(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 }
+
+// TestPortfolio_DuplicateCheck tests duplicate title validation
+func TestPortfolio_DuplicateCheck(t *testing.T) {
+	token := GetTestAuthToken()
+	userID := GetTestUserID()
+
+	t.Run("Error_CreateDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create first portfolio
+		CreateTestPortfolioWithTitle(testDB.DB, userID, "My Portfolio")
+
+		// Try to create second portfolio with same title
+		payload := map[string]interface{}{
+			"title":       "My Portfolio",
+			"description": "Another portfolio",
+		}
+
+		resp := MakeRequest(t, "POST", "/api/portfolios/own", payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_CreateDifferentTitle", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create first portfolio
+		CreateTestPortfolioWithTitle(testDB.DB, userID, "My Portfolio")
+
+		// Create second portfolio with different title - should succeed
+		payload := map[string]interface{}{
+			"title":       "My Other Portfolio",
+			"description": "Another portfolio",
+		}
+
+		resp := MakeRequest(t, "POST", "/api/portfolios/own", payload, token)
+		assert.Equal(t, 201, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Error_UpdateToDuplicate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create two portfolios
+		portfolio1 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio One")
+		portfolio2 := CreateTestPortfolioWithTitle(testDB.DB, userID, "Portfolio Two")
+
+		// Try to update portfolio2 to have same title as portfolio1
+		payload := map[string]interface{}{
+			"title": "Portfolio One",
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/portfolios/own/%d", portfolio2.ID), payload, token)
+		assert.Equal(t, 400, resp.Code)
+
+		AssertJSONResponse(t, resp, 400, func(body map[string]interface{}) {
+			assert.Contains(t, body, "error")
+			assert.Contains(t, body["error"], "already exists")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_UpdateSameTitle", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create portfolio
+		portfolio := CreateTestPortfolioWithTitle(testDB.DB, userID, "My Portfolio")
+
+		// Update with same title but different description - should succeed
+		payload := map[string]interface{}{
+			"title":       "My Portfolio",
+			"description": "Updated description",
+		}
+
+		resp := MakeRequest(t, "PUT", fmt.Sprintf("/api/portfolios/own/%d", portfolio.ID), payload, token)
+		assert.Equal(t, 200, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+}
