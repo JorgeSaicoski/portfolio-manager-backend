@@ -32,14 +32,26 @@ type ProjectRepository interface {
 type SectionRepository interface {
 	Create(section *models.Section) error
 	GetByID(id uint) (*models.Section, error)
+	GetByIDWithRelations(id uint) (*models.Section, error)
 	GetByOwnerID(ownerID string, limit, offset int) ([]*models.Section, error)
 	GetByPortfolioID(portfolioID string) ([]*models.Section, error)
+	GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error)
 	GetByType(sectionType string) ([]*models.Section, error)
 	Update(section *models.Section) error
 	UpdatePosition(id uint, position uint) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Section, error)
 	CheckDuplicate(title string, portfolioID uint, id uint) (bool, error)
+}
+
+type SectionContentRepository interface {
+	Create(content *models.SectionContent) error
+	GetByID(id uint) (*models.SectionContent, error)
+	GetBySectionID(sectionID uint) ([]*models.SectionContent, error)
+	Update(content *models.SectionContent) error
+	UpdateOrder(id uint, order uint) error
+	Delete(id uint) error
+	CheckDuplicateOrder(sectionID uint, order uint, id uint) (bool, error)
 }
 
 type CategoryRepository interface {

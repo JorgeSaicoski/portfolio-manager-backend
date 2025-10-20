@@ -37,10 +37,33 @@ func (r *sectionRepository) GetByID(id uint) (*models.Section, error) {
 	return &section, err
 }
 
+// GetByIDWithRelations For detail views - with contents preloaded
+func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, error) {
+	var section models.Section
+	err := r.db.Preload("Contents", func(db *gorm.DB) *gorm.DB {
+		return db.Order("section_contents.order ASC, section_contents.created_at ASC")
+	}).
+		Where("id = ?", id).
+		First(&section).Error
+	return &section, err
+}
+
 // For list views - only basic portfolio info
 func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]*models.Section, error) {
 	var sections []*models.Section
 	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
+		Where("portfolio_id = ?", portfolioID).
+		Order("position ASC, created_at ASC").
+		Find(&sections).Error
+	return sections, err
+}
+
+// GetByPortfolioIDWithRelations For detail views - with contents preloaded
+func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error) {
+	var sections []*models.Section
+	err := r.db.Preload("Contents", func(db *gorm.DB) *gorm.DB {
+		return db.Order("section_contents.order ASC, section_contents.created_at ASC")
+	}).
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
 		Find(&sections).Error
