@@ -137,3 +137,40 @@ func ValidatePortfolio(portfolio *models.Portfolio) error {
 
 	return nil
 }
+
+// ValidateSectionContent validates all section content fields
+func ValidateSectionContent(content *models.SectionContent) error {
+	// Validate section_id is provided
+	if content.SectionID == 0 {
+		return ValidationError{
+			Field:   "SectionID",
+			Message: "Section ID is required",
+		}
+	}
+
+	// Validate type
+	if content.Type != "text" && content.Type != "image" {
+		return ValidationError{
+			Field:   "Type",
+			Message: "Type must be either 'text' or 'image'",
+		}
+	}
+
+	// Validate content
+	if err := ValidateStringLength(content.Content, "Content", 1, 5000); err != nil {
+		return err
+	}
+
+	// Metadata is optional (pointer), so only validate if present
+	if content.Metadata != nil {
+		// Basic validation - check if not too long
+		if len(*content.Metadata) > 10000 {
+			return ValidationError{
+				Field:   "Metadata",
+				Message: "Metadata must be less than 10000 characters",
+			}
+		}
+	}
+
+	return nil
+}

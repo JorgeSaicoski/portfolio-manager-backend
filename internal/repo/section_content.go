@@ -28,8 +28,8 @@ func (r *sectionContentRepository) GetByID(id uint) (*models.SectionContent, err
 }
 
 // GetBySectionID retrieves all content blocks for a section, ordered by position
-func (r *sectionContentRepository) GetBySectionID(sectionID uint) ([]*models.SectionContent, error) {
-	var contents []*models.SectionContent
+func (r *sectionContentRepository) GetBySectionID(sectionID uint) ([]models.SectionContent, error) {
+	var contents []models.SectionContent
 	err := r.db.Where("section_id = ?", sectionID).
 		Order("\"order\" ASC, created_at ASC").
 		Find(&contents).Error

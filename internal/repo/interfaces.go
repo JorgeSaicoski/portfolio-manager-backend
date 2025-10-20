@@ -47,7 +47,7 @@ type SectionRepository interface {
 type SectionContentRepository interface {
 	Create(content *models.SectionContent) error
 	GetByID(id uint) (*models.SectionContent, error)
-	GetBySectionID(sectionID uint) ([]*models.SectionContent, error)
+	GetBySectionID(sectionID uint) ([]models.SectionContent, error)
 	Update(content *models.SectionContent) error
 	UpdateOrder(id uint, order uint) error
 	Delete(id uint) error

@@ -9,7 +9,7 @@ type SectionContent struct {
 	SectionID uint    `json:"section_id" gorm:"not null;index"`
 	Type      string  `json:"type" gorm:"type:varchar(10);not null"` // "text" or "image"
 	Content   string  `json:"content" gorm:"type:text;not null"`
-	Order     uint    `json:"order" gorm:"default:0;index"`
+	Order     uint    `json:"order" gorm:"column:order;default:0;index"`
 	Metadata  *string `json:"metadata,omitempty" gorm:"type:jsonb"` // JSON for additional properties
 	OwnerID   string  `json:"owner_id,omitempty" gorm:"type:varchar(255);index"`
 

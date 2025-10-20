@@ -29,7 +29,7 @@ func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]*
 	return sections, err
 }
 
-// For detail views - basic section info
+// GetByID For detail views - basic section info
 func (r *sectionRepository) GetByID(id uint) (*models.Section, error) {
 	var section models.Section
 	err := r.db.Where("id = ?", id).
@@ -48,7 +48,7 @@ func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, erro
 	return &section, err
 }
 
-// For list views - only basic portfolio info
+// GetByPortfolioID For list views - only basic portfolio info
 func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]*models.Section, error) {
 	var sections []*models.Section
 	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").

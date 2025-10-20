@@ -35,10 +35,10 @@ func ToSectionContentResponse(content *models.SectionContent) SectionContentResp
 }
 
 // ToSectionContentListResponse converts a slice of models to response DTOs
-func ToSectionContentListResponse(contents []*models.SectionContent) []SectionContentResponse {
-	responses := make([]SectionContentResponse, len(contents))
-	for i, content := range contents {
-		responses[i] = ToSectionContentResponse(content)
+func ToSectionContentListResponse(contents []models.SectionContent) []SectionContentResponse {
+	responses := make([]SectionContentResponse, 0, len(contents))
+	for i := range contents {
+		responses = append(responses, ToSectionContentResponse(&contents[i]))
 	}
 	return responses
 }
