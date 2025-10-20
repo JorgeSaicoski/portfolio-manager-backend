@@ -64,3 +64,21 @@ func (r *portfolioRepository) List(limit, offset int) ([]*models.Portfolio, erro
 		Find(&portfolios).Error
 	return portfolios, err
 }
+
+// CheckDuplicate checks if a portfolio with the same title exists for the same owner
+// excluding the portfolio with the given id (useful for updates)
+func (r *portfolioRepository) CheckDuplicate(title string, ownerID string, id uint) (bool, error) {
+	var count int64
+	query := r.db.Model(&models.Portfolio{}).Where("title = ? AND owner_id = ?", title, ownerID)
+
+	// Exclude the current portfolio when checking for duplicates (for updates)
+	if id != 0 {
+		query = query.Where("id != ?", id)
+	}
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

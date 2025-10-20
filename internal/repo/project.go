@@ -65,3 +65,21 @@ func (r *projectRepository) GetByClient(client string) ([]*models.Project, error
 		Find(&projects).Error
 	return projects, err
 }
+
+// CheckDuplicate checks if a project with the same title exists for the same category
+// excluding the project with the given id (useful for updates)
+func (r *projectRepository) CheckDuplicate(title string, categoryID uint, id uint) (bool, error) {
+	var count int64
+	query := r.db.Model(&models.Project{}).Where("title = ? AND category_id = ?", title, categoryID)
+
+	// Exclude the current project when checking for duplicates (for updates)
+	if id != 0 {
+		query = query.Where("id != ?", id)
+	}
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

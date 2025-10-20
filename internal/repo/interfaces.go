@@ -12,6 +12,7 @@ type PortfolioRepository interface {
 	Update(portfolio *models.Portfolio) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Portfolio, error)
+	CheckDuplicate(title string, ownerID string, id uint) (bool, error)
 }
 
 type ProjectRepository interface {
@@ -23,6 +24,7 @@ type ProjectRepository interface {
 	List(limit, offset int) ([]*models.Project, error)
 	GetBySkills(skills []string) ([]*models.Project, error)
 	GetByClient(client string) ([]*models.Project, error)
+	CheckDuplicate(title string, categoryID uint, id uint) (bool, error)
 }
 
 type SectionRepository interface {
@@ -34,6 +36,7 @@ type SectionRepository interface {
 	Update(section *models.Section) error
 	Delete(id uint) error
 	List(limit, offset int) ([]*models.Section, error)
+	CheckDuplicate(title string, portfolioID uint, id uint) (bool, error)
 }
 
 type CategoryRepository interface {

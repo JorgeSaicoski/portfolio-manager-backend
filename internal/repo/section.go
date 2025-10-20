@@ -66,3 +66,21 @@ func (r *sectionRepository) List(limit, offset int) ([]*models.Section, error) {
 		Find(&sections).Error
 	return sections, err
 }
+
+// CheckDuplicate checks if a section with the same title exists for the same portfolio
+// excluding the section with the given id (useful for updates)
+func (r *sectionRepository) CheckDuplicate(title string, portfolioID uint, id uint) (bool, error) {
+	var count int64
+	query := r.db.Model(&models.Section{}).Where("title = ? AND portfolio_id = ?", title, portfolioID)
+
+	// Exclude the current section when checking for duplicates (for updates)
+	if id != 0 {
+		query = query.Where("id != ?", id)
+	}
+
+	err := query.Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

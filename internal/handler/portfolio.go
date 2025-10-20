@@ -91,6 +91,21 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.OwnerID, updateData.ID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to check for duplicate portfolio",
+		})
+		return
+	}
+	if isDuplicate {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Portfolio with this title already exists",
+		})
+		return
+	}
+
 	// Update portfolio
 	if err := h.repo.Update(&updateData); err != nil {
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -128,6 +143,21 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 	if err := validator.ValidatePortfolio(&newPortfolio); err != nil {
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: err.Error(),
+		})
+		return
+	}
+
+	// Check for duplicate title
+	isDuplicate, err := h.repo.CheckDuplicate(newPortfolio.Title, newPortfolio.OwnerID, 0)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
+			Error: "Failed to check for duplicate portfolio",
+		})
+		return
+	}
+	if isDuplicate {
+		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
+			Error: "Portfolio with this title already exists",
 		})
 		return
 	}
