@@ -3,6 +3,7 @@ package test
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -32,7 +33,7 @@ func TestMain(m *testing.M) {
 
 	// Start server in background
 	go func() {
-		if err := testServer.Start(); err != nil {
+		if err := testServer.Start(); err != nil && err != http.ErrServerClosed {
 			testLogger.Fatalf("Failed to start test server: %v", err)
 		}
 	}()
