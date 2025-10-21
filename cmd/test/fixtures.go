@@ -1,13 +1,13 @@
 package test
 
 import (
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
+	models2 "github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
 	"gorm.io/gorm"
 )
 
 // Portfolio fixtures
-func CreateTestPortfolio(db *gorm.DB, ownerID string) *models.Portfolio {
-	portfolio := &models.Portfolio{
+func CreateTestPortfolio(db *gorm.DB, ownerID string) *models2.Portfolio {
+	portfolio := &models2.Portfolio{
 		Title:       "Test Portfolio",
 		Description: stringPtr("Test description"),
 		OwnerID:     ownerID,
@@ -16,8 +16,8 @@ func CreateTestPortfolio(db *gorm.DB, ownerID string) *models.Portfolio {
 	return portfolio
 }
 
-func CreateTestPortfolioWithTitle(db *gorm.DB, ownerID string, title string) *models.Portfolio {
-	portfolio := &models.Portfolio{
+func CreateTestPortfolioWithTitle(db *gorm.DB, ownerID string, title string) *models2.Portfolio {
+	portfolio := &models2.Portfolio{
 		Title:       title,
 		Description: stringPtr("Test description"),
 		OwnerID:     ownerID,
@@ -27,8 +27,8 @@ func CreateTestPortfolioWithTitle(db *gorm.DB, ownerID string, title string) *mo
 }
 
 // Category fixtures
-func CreateTestCategory(db *gorm.DB, portfolioID uint, ownerID string) *models.Category {
-	category := &models.Category{
+func CreateTestCategory(db *gorm.DB, portfolioID uint, ownerID string) *models2.Category {
+	category := &models2.Category{
 		Title:       "Test Category",
 		Description: stringPtr("Test category description"),
 		PortfolioID: portfolioID,
@@ -38,8 +38,8 @@ func CreateTestCategory(db *gorm.DB, portfolioID uint, ownerID string) *models.C
 	return category
 }
 
-func CreateTestCategoryWithTitle(db *gorm.DB, portfolioID uint, ownerID string, title string) *models.Category {
-	category := &models.Category{
+func CreateTestCategoryWithTitle(db *gorm.DB, portfolioID uint, ownerID string, title string) *models2.Category {
+	category := &models2.Category{
 		Title:       title,
 		Description: stringPtr("Test category description"),
 		PortfolioID: portfolioID,
@@ -50,8 +50,8 @@ func CreateTestCategoryWithTitle(db *gorm.DB, portfolioID uint, ownerID string, 
 }
 
 // Project fixtures
-func CreateTestProject(db *gorm.DB, categoryID uint, ownerID string) *models.Project {
-	project := &models.Project{
+func CreateTestProject(db *gorm.DB, categoryID uint, ownerID string) *models2.Project {
+	project := &models2.Project{
 		Title:       "Test Project",
 		Description: "Test project description",
 		Images:      []string{},
@@ -66,8 +66,8 @@ func CreateTestProject(db *gorm.DB, categoryID uint, ownerID string) *models.Pro
 	return project
 }
 
-func CreateTestProjectWithTitle(db *gorm.DB, categoryID uint, ownerID string, title string) *models.Project {
-	project := &models.Project{
+func CreateTestProjectWithTitle(db *gorm.DB, categoryID uint, ownerID string, title string) *models2.Project {
+	project := &models2.Project{
 		Title:       title,
 		Description: "Test project description",
 		Images:      []string{},
@@ -83,8 +83,8 @@ func CreateTestProjectWithTitle(db *gorm.DB, categoryID uint, ownerID string, ti
 }
 
 // Section fixtures
-func CreateTestSection(db *gorm.DB, portfolioID uint, ownerID string) *models.Section {
-	section := &models.Section{
+func CreateTestSection(db *gorm.DB, portfolioID uint, ownerID string) *models2.Section {
+	section := &models2.Section{
 		Title:       "Test Section",
 		Description: stringPtr("Test section description"),
 		Type:        "text",
@@ -95,8 +95,8 @@ func CreateTestSection(db *gorm.DB, portfolioID uint, ownerID string) *models.Se
 	return section
 }
 
-func CreateTestSectionWithTitle(db *gorm.DB, portfolioID uint, ownerID string, title string) *models.Section {
-	section := &models.Section{
+func CreateTestSectionWithTitle(db *gorm.DB, portfolioID uint, ownerID string, title string) *models2.Section {
+	section := &models2.Section{
 		Title:       title,
 		Description: stringPtr("Test section description"),
 		Type:        "text",

@@ -3,8 +3,8 @@ package main
 import (
 	"os"
 
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/db"
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/server"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/sirupsen/logrus"
 )
 

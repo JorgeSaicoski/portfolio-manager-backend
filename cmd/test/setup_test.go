@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/db"
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/server"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/joho/godotenv"
 	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
