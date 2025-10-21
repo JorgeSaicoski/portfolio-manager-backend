@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/models"
@@ -50,10 +51,19 @@ func (d *Database) Initialize() error {
 		return fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	// Connection pool settings
-	sqlDB.SetMaxIdleConns(10)
-	sqlDB.SetMaxOpenConns(100)
-	sqlDB.SetConnMaxLifetime(time.Hour)
+	// Connection pool settings - configurable via environment variables
+	maxIdleConns := d.getEnvInt("DB_MAX_IDLE_CONNS", 10)
+	maxOpenConns := d.getEnvInt("DB_MAX_OPEN_CONNS", 100)
+	connMaxLifetime := d.getEnvDuration("DB_CONN_MAX_LIFETIME", time.Hour)
+	connMaxIdleTime := d.getEnvDuration("DB_CONN_MAX_IDLE_TIME", 10*time.Minute)
+
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetConnMaxLifetime(connMaxLifetime)
+	sqlDB.SetConnMaxIdleTime(connMaxIdleTime)
+
+	log.Printf("Database connection pool configured: MaxIdle=%d, MaxOpen=%d, MaxLifetime=%s, MaxIdleTime=%s",
+		maxIdleConns, maxOpenConns, connMaxLifetime, connMaxIdleTime)
 
 	log.Println("Connected to PostgreSQL database")
 	return nil
@@ -77,6 +87,12 @@ func (d *Database) Migrate() error {
 	}
 
 	log.Println("Database migration completed successfully")
+
+	// Apply performance indexes
+	if err := ApplyPerformanceIndexes(d.DB); err != nil {
+		return fmt.Errorf("failed to apply performance indexes: %w", err)
+	}
+
 	return nil
 }
 
@@ -96,6 +112,24 @@ func (d *Database) buildDSN() string {
 func (d *Database) getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func (d *Database) getEnvInt(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+func (d *Database) getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	if value := os.Getenv(key); value != "" {
+		if duration, err := time.ParseDuration(value); err == nil {
+			return duration
+		}
 	}
 	return defaultValue
 }

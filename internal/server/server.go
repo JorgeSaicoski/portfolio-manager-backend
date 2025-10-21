@@ -7,6 +7,7 @@ import (
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/db"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/metrics"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/middleware"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/router"
 	"github.com/gin-gonic/gin"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -70,6 +71,10 @@ func (s *Server) setupMiddleware() {
 	s.engine.Use(gin.Recovery())
 	s.engine.Use(s.metricsMiddleware())
 	s.engine.Use(s.corsMiddleware())
+
+	// Performance middleware
+	s.engine.Use(middleware.Compression())
+	s.engine.Use(middleware.HTTPCache())
 }
 
 func (s *Server) setupRoutes() {
