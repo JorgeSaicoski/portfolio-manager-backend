@@ -3,6 +3,7 @@ module github.com/JorgeSaicoski/portfolio-manager/backend
 go 1.23.11
 
 require (
+	github.com/coreos/go-oidc/v3 v3.11.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
