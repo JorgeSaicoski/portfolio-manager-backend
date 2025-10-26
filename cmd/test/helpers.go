@@ -79,15 +79,15 @@ func AssertErrorResponse(t *testing.T, recorder *httptest.ResponseRecorder, expe
 
 // GetTestAuthToken returns a test JWT token
 // In testing mode (TESTING_MODE=true), the auth middleware accepts
-// any token and returns a test user with ID: 123
+// any token and returns a test user with ID: test-user-123
 func GetTestAuthToken() string {
 	return "test-token-123"
 }
 
 // GetTestUserID returns a test user ID for creating fixtures
-// This should match the user ID from the auth middleware test user (ID: 123)
+// This should match the user ID from the auth middleware test user (test-user-123)
 func GetTestUserID() string {
-	return "123" // Matches test user ID from middleware
+	return "test-user-123" // Matches test user ID from auth middleware
 }
 
 // ParseJSONBody parses the response body into a map

@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"io"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
@@ -127,7 +128,7 @@ func HTTPCacheWithTTL(maxAge int) gin.HandlerFunc {
 
 		// Set cache control headers with custom max-age
 		if maxAge > 0 {
-			c.Header("Cache-Control", "public, max-age="+string(rune(maxAge)))
+			c.Header("Cache-Control", "public, max-age="+strconv.Itoa(maxAge))
 		}
 	}
 }
