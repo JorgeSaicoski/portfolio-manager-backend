@@ -7,10 +7,20 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+// getBaseURL returns the base URL for test requests
+func getBaseURL() string {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8888"
+	}
+	return fmt.Sprintf("http://localhost:%s", port)
+}
 
 // MakeRequest creates and executes an HTTP request
 func MakeRequest(t *testing.T, method, path string, body interface{}, token string) *httptest.ResponseRecorder {
@@ -21,7 +31,7 @@ func MakeRequest(t *testing.T, method, path string, body interface{}, token stri
 		bodyReader = bytes.NewBuffer(jsonBody)
 	}
 
-	url := fmt.Sprintf("%s%s", baseURL, path)
+	url := fmt.Sprintf("%s%s", getBaseURL(), path)
 	req, err := http.NewRequest(method, url, bodyReader)
 	assert.NoError(t, err)
 

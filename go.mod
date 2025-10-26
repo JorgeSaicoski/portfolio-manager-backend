@@ -1,9 +1,9 @@
 module github.com/JorgeSaicoski/portfolio-manager/backend
 
-go 1.23.11
+go 1.24.0
 
 require (
-	github.com/coreos/go-oidc/v3 v3.11.0
+	github.com/coreos/go-oidc/v3 v3.16.0
 	github.com/gin-gonic/gin v1.10.1
 	github.com/joho/godotenv v1.5.1
 	github.com/lib/pq v1.10.9
@@ -14,7 +14,7 @@ require (
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/go-jose/go-jose/v4 v4.0.2 // indirect
+	github.com/go-jose/go-jose/v4 v4.1.3 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/pgx/v5 v5.6.0 // indirect
