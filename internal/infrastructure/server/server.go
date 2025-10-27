@@ -3,6 +3,8 @@ package server
 import (
 	"context"
 	"net/http"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/router"
@@ -67,22 +69,49 @@ func (s *Server) setupEngine() {
 }
 
 func (s *Server) setupMiddleware() {
+	// Security middleware (applied first)
+	s.engine.Use(middleware2.RequestID())        // Add request ID for tracing
+	s.engine.Use(middleware2.PanicRecovery())    // Enhanced panic recovery
+	s.engine.Use(middleware2.SecurityHeaders())  // Security headers
+	s.engine.Use(middleware2.RequestSizeLimit()) // Request size limits
+	s.engine.Use(middleware2.RateLimit())        // Rate limiting
+
+	// Logging and metrics
 	s.engine.Use(s.loggingMiddleware())
-	s.engine.Use(gin.Recovery())
 	s.engine.Use(s.metricsMiddleware())
+
+	// CORS
 	s.engine.Use(s.corsMiddleware())
 
 	// Performance middleware
 	s.engine.Use(middleware2.Compression())
 	s.engine.Use(middleware2.HTTPCache())
+
+	s.logger.Info("Security middleware initialized")
 }
 
 func (s *Server) setupRoutes() {
 	// Health check
 	s.engine.GET("/health", s.healthHandler)
 	s.engine.GET("/ready", s.readinessHandler)
-	s.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
 	s.engine.HEAD("/health", s.readinessHandler)
+
+	// Metrics endpoint with basic auth protection
+	metricsUser := os.Getenv("PROMETHEUS_AUTH_USER")
+	metricsPassword := os.Getenv("PROMETHEUS_AUTH_PASSWORD")
+
+	if metricsUser != "" && metricsPassword != "" {
+		// Protected metrics endpoint
+		authorized := s.engine.Group("/", gin.BasicAuth(gin.Accounts{
+			metricsUser: metricsPassword,
+		}))
+		authorized.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		s.logger.Info("Metrics endpoint protected with basic authentication")
+	} else {
+		// Unprotected metrics (development only)
+		s.engine.GET("/metrics", gin.WrapH(promhttp.Handler()))
+		s.logger.Warn("Metrics endpoint is unprotected - set PROMETHEUS_AUTH_USER and PROMETHEUS_AUTH_PASSWORD")
+	}
 
 	// API group
 	api := s.engine.Group("/api")
@@ -164,10 +193,45 @@ func (s *Server) metricsMiddleware() gin.HandlerFunc {
 }
 
 func (s *Server) corsMiddleware() gin.HandlerFunc {
+	// Get allowed origins from environment
+	allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		// Default for development
+		allowedOrigins = "*"
+	}
+
 	return func(c *gin.Context) {
-		c.Header("Access-Control-Allow-Origin", "*")
+		origin := c.Request.Header.Get("Origin")
+
+		// In production, check against allowed origins
+		if allowedOrigins == "*" {
+			c.Header("Access-Control-Allow-Origin", "*")
+		} else {
+			// Check if origin is in allowed list
+			allowed := false
+			for _, allowedOrigin := range strings.Split(allowedOrigins, ",") {
+				if strings.TrimSpace(allowedOrigin) == origin {
+					allowed = true
+					break
+				}
+			}
+
+			if allowed {
+				c.Header("Access-Control-Allow-Origin", origin)
+				c.Header("Access-Control-Allow-Credentials", "true")
+			} else {
+				// Log unauthorized origin attempt
+				s.logger.WithFields(logrus.Fields{
+					"origin": origin,
+					"ip":     c.ClientIP(),
+				}).Warn("CORS request from unauthorized origin")
+			}
+		}
+
 		c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID")
+		c.Header("Access-Control-Expose-Headers", "X-Request-ID")
+		c.Header("Access-Control-Max-Age", "86400") // 24 hours
 
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(http.StatusNoContent)

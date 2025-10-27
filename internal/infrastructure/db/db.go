@@ -24,18 +24,39 @@ func NewDatabase() *Database {
 func (d *Database) Initialize() error {
 	dsn := d.buildDSN()
 
+	// Get query timeout from environment (default: 30 seconds)
+	queryTimeoutStr := os.Getenv("DB_QUERY_TIMEOUT")
+	queryTimeout := 30 * time.Second
+	if queryTimeoutStr != "" {
+		if timeout, err := time.ParseDuration(queryTimeoutStr + "s"); err == nil {
+			queryTimeout = timeout
+		}
+	}
+
 	var err error
 	d.DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{
+		// Enable prepared statement caching for better performance
+		PrepareStmt: true,
+
+		// Query timeout configuration
+		NowFunc: func() time.Time {
+			return time.Now()
+		},
+
 		Logger: logger.New(
 			log.New(os.Stdout, "\r\n", log.LstdFlags),
 			logger.Config{
-				SlowThreshold:             time.Second,
-				LogLevel:                  logger.Info,
+				SlowThreshold:             queryTimeout,
+				LogLevel:                  getLogLevel(),
 				IgnoreRecordNotFoundError: true,
 				Colorful:                  false,
 			},
 		),
 	})
+
+	if err == nil {
+		log.Printf("Database query timeout configured: %s", queryTimeout)
+	}
 
 	if err != nil {
 		return fmt.Errorf("failed to connect to database: %w", err)
@@ -145,4 +166,25 @@ func (d *Database) Close() error {
 	}
 
 	return sqlDB.Close()
+}
+
+// getLogLevel returns the appropriate GORM log level based on environment
+func getLogLevel() logger.LogLevel {
+	logLevel := os.Getenv("DB_LOG_LEVEL")
+	switch logLevel {
+	case "silent":
+		return logger.Silent
+	case "error":
+		return logger.Error
+	case "warn":
+		return logger.Warn
+	case "info":
+		return logger.Info
+	default:
+		// In production, use Error level; in development, use Info
+		if os.Getenv("GIN_MODE") == "release" {
+			return logger.Error
+		}
+		return logger.Info
+	}
 }

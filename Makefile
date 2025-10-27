@@ -108,7 +108,7 @@ test-coverage:
 	go tool cover -func=coverage.out
 
 test-docker:
-	@echo "Running tests in isolated Docker environment..."
+	@echo "Running tests in isolated Podman environment..."
 	podman compose -f ../docker-compose.test.yml run --rm portfolio-backend-test
 
 test-clean:

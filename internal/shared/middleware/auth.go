@@ -1,17 +1,74 @@
 package middleware
 
 import (
-	"encoding/json"
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 	"strings"
+	"sync"
+	"time"
 
-	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
-// AuthMiddleware validates tokens by forwarding to auth service
+var (
+	oidcVerifier    *oidc.IDTokenVerifier
+	oidcProvider    *oidc.Provider
+	oidcInitOnce    sync.Once
+	oidcInitError   error
+	authentikIssuer string
+	logger          = logrus.New()
+)
+
+// InitOIDC initializes the OIDC provider and verifier
+func InitOIDC() error {
+	oidcInitOnce.Do(func() {
+		authentikIssuer = os.Getenv("AUTHENTIK_ISSUER")
+		if authentikIssuer == "" {
+			oidcInitError = fmt.Errorf("AUTHENTIK_ISSUER environment variable not set")
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+
+		// Initialize OIDC provider
+		provider, err := oidc.NewProvider(ctx, authentikIssuer)
+		if err != nil {
+			oidcInitError = fmt.Errorf("failed to create OIDC provider: %w", err)
+			return
+		}
+		oidcProvider = provider
+
+		// Create ID token verifier
+		oidcVerifier = provider.Verifier(&oidc.Config{
+			SkipClientIDCheck: true, // We'll accept tokens from any client
+		})
+
+		logger.WithFields(logrus.Fields{
+			"issuer": authentikIssuer,
+		}).Info("OIDC provider initialized successfully")
+	})
+
+	return oidcInitError
+}
+
+// User represents the authenticated user from Authentik
+type User struct {
+	Sub               string `json:"sub"`
+	Email             string `json:"email"`
+	EmailVerified     bool   `json:"email_verified"`
+	Name              string `json:"name"`
+	PreferredUsername string `json:"preferred_username"`
+	GivenName         string `json:"given_name"`
+	FamilyName        string `json:"family_name"`
+	Nickname          string `json:"nickname"`
+}
+
+// AuthMiddleware validates OAuth2/OIDC tokens from Authentik
 func AuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get Authorization header
@@ -30,76 +87,82 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
-		var user *models.User
-		var err error
+		accessToken := tokenParts[1]
 
 		// Check if we're in testing mode
 		if os.Getenv("TESTING_MODE") == "true" {
-			// In testing mode, use a simple test user from the token
-			user = getTestUser(tokenParts[1])
-		} else {
-			// Forward request to auth service to validate token
-			user, err = validateTokenWithAuthService(authHeader)
-			if err != nil {
-				c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
-				c.Abort()
-				return
-			}
+			// In testing mode, use a simple test user
+			user := getTestUser()
+			c.Set("userID", user.Sub)
+			c.Set("user", user)
+			c.Next()
+			return
+		}
+
+		// Ensure OIDC is initialized
+		if err := InitOIDC(); err != nil {
+			logger.WithError(err).Error("OIDC not initialized")
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication service unavailable"})
+			c.Abort()
+			return
+		}
+
+		// Verify the access token as an ID token
+		// Note: Authentik's access tokens are JWTs that can be verified like ID tokens
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		idToken, err := oidcVerifier.Verify(ctx, accessToken)
+		if err != nil {
+			logger.WithError(err).WithField("token_prefix", accessToken[:min(20, len(accessToken))]).Warn("Token verification failed")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		// Extract claims
+		var user User
+		if err := idToken.Claims(&user); err != nil {
+			logger.WithError(err).Error("Failed to extract claims from token")
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
+			c.Abort()
+			return
 		}
 
 		// Set user data in context for handlers to use
-		// Convert user ID to string for consistent usage in handlers
-		c.Set("userID", fmt.Sprintf("%d", user.ID))
+		c.Set("userID", user.Sub) // Use Authentik's subject (user ID) as userID
 		c.Set("user", user)
+		c.Set("email", user.Email)
+		c.Set("username", user.PreferredUsername)
+
+		logger.WithFields(logrus.Fields{
+			"user_id":  user.Sub,
+			"email":    user.Email,
+			"username": user.PreferredUsername,
+		}).Debug("User authenticated successfully")
+
 		c.Next()
 	}
 }
 
 // getTestUser creates a test user for testing purposes
-// Token format: any value returns the default test user
-func getTestUser(token string) *models.User {
-	return &models.User{
-		ID:       123, // Test user ID as uint
-		Username: "testuser",
-		Email:    "test@example.com",
+func getTestUser() User {
+	return User{
+		Sub:               "test-user-123",
+		Email:             "test@example.com",
+		EmailVerified:     true,
+		Name:              "Test User",
+		PreferredUsername: "testuser",
+		GivenName:         "Test",
+		FamilyName:        "User",
+		Nickname:          "testuser",
 	}
 }
 
-// validateTokenWithAuthService calls the auth service to validate token and get user
-func validateTokenWithAuthService(authHeader string) (*models.User, error) {
-	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-	if authServiceURL == "" {
-		authServiceURL = "http://localhost:8080" // fallback for development
+// Helper function for min
+func min(a, b int) int {
+	if a < b {
+		return a
 	}
-
-	// Create request to auth service profile endpoint
-	req, err := http.NewRequest("GET", authServiceURL+"/api/profile", nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Forward the Authorization header
-	req.Header.Set("Authorization", authHeader)
-	req.Header.Set("Content-Type", "application/json")
-
-	// Make the request
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to call auth service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check if auth service returned success
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("auth service returned status: %d", resp.StatusCode)
-	}
-
-	// Decode user data from response
-	var user models.User
-	if err := json.NewDecoder(resp.Body).Decode(&user); err != nil {
-		return nil, fmt.Errorf("failed to decode user data: %w", err)
-	}
-
-	return &user, nil
+	return b
 }
