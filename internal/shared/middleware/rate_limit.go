@@ -123,6 +123,13 @@ func (rl *RateLimiter) cleanupVisitors() {
 
 // RateLimit is the middleware function for rate limiting
 func RateLimit() gin.HandlerFunc {
+	// Skip rate limiting in test mode
+	if os.Getenv("TESTING_MODE") == "true" {
+		return func(c *gin.Context) {
+			c.Next()
+		}
+	}
+
 	limiter := initRateLimiter()
 
 	return func(c *gin.Context) {
