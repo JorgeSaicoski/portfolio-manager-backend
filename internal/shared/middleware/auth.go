@@ -26,14 +26,47 @@ var (
 // InitOIDC initializes the OIDC provider and verifier
 func InitOIDC() error {
 	oidcInitOnce.Do(func() {
-		authentikIssuer = os.Getenv("AUTHENTIK_ISSUER")
-		if authentikIssuer == "" {
-			oidcInitError = fmt.Errorf("AUTHENTIK_ISSUER environment variable not set")
+		// Use AUTHENTIK_URL for OIDC provider initialization (container-to-container communication)
+		// Fall back to AUTHENTIK_ISSUER for backward compatibility
+		authentikURL := os.Getenv("AUTHENTIK_URL")
+		if authentikURL == "" {
+			authentikURL = os.Getenv("AUTHENTIK_ISSUER")
+		}
+
+		if authentikURL == "" {
+			oidcInitError = fmt.Errorf("AUTHENTIK_URL or AUTHENTIK_ISSUER environment variable not set")
 			return
+		}
+
+		// Build the full issuer URL if needed
+		if !strings.HasSuffix(authentikURL, "/") {
+			authentikURL += "/"
+		}
+
+		// If URL doesn't already include the application path, append it
+		if !strings.Contains(authentikURL, "/application/o/") {
+			authentikIssuer = authentikURL + "application/o/portfolio-manager/"
+		} else {
+			authentikIssuer = authentikURL
 		}
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
+
+		// Get the public issuer URL (what tokens will contain)
+		// This is typically the browser-accessible URL like http://localhost:9000
+		// while authentikIssuer is the internal container URL like http://portfolio-authentik-server:9000
+		publicIssuer := os.Getenv("AUTHENTIK_ISSUER")
+		if publicIssuer != "" && publicIssuer != authentikIssuer {
+			// Use InsecureIssuerURLContext to handle issuer mismatch in containerized environments
+			// This allows backend to discover OIDC config via internal URL (authentikIssuer)
+			// but validate tokens with public issuer URL (publicIssuer)
+			logger.WithFields(logrus.Fields{
+				"discovery_url": authentikIssuer,
+				"token_issuer":  publicIssuer,
+			}).Info("Using separate discovery and token issuer URLs for containerized environment")
+			ctx = oidc.InsecureIssuerURLContext(ctx, publicIssuer)
+		}
 
 		// Initialize OIDC provider
 		provider, err := oidc.NewProvider(ctx, authentikIssuer)
