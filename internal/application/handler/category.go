@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,6 +12,7 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type CategoryHandler struct {
@@ -105,26 +107,59 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 func (h *CategoryHandler) Create(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 
+	// Log initial request
+	logrus.WithFields(logrus.Fields{
+		"userID": userID,
+		"path":   c.Request.URL.Path,
+	}).Info("Category creation request received")
+
 	// Parse request body
 	var newCategory models.Category
 	if err := c.ShouldBindJSON(&newCategory); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+			"error":  err.Error(),
+		}).Error("Failed to parse category creation request")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
+
+	// Log parsed request
+	reqJSON, _ := json.Marshal(newCategory)
+	logrus.WithFields(logrus.Fields{
+		"userID":  userID,
+		"request": string(reqJSON),
+	}).Info("Parsed category creation request")
 
 	// Set the owner
 	newCategory.OwnerID = userID
 
 	// Validate category data
 	if err := validator.ValidateCategory(&newCategory); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+			"error":  err.Error(),
+		}).Error("Category validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"userID":       userID,
+		"title":        newCategory.Title,
+		"portfolio_id": newCategory.PortfolioID,
+	}).Info("Category validation passed, creating category")
 
 	// Create category
 	if err := h.repo.Create(&newCategory); err != nil {
 		// Check if error is due to foreign key constraint (invalid portfolio_id)
 		errMsg := err.Error()
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"error":        errMsg,
+			"portfolio_id": newCategory.PortfolioID,
+		}).Error("Failed to create category")
+
 		if strings.Contains(errMsg, "fk_portfolios_categories") || strings.Contains(errMsg, "23503") {
 			response.NotFound(c, "Portfolio not found")
 			return
@@ -132,6 +167,12 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		response.InternalError(c, "Failed to create category")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"userID":      userID,
+		"categoryID":  newCategory.ID,
+		"title":       newCategory.Title,
+	}).Info("Category created successfully")
 
 	response.Created(c, "category", &newCategory, "Category created successfully")
 }
