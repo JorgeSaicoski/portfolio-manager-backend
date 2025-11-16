@@ -104,3 +104,30 @@ func ApplyPerformanceIndexes(db *gorm.DB) error {
 	log.Println("Performance indexes applied successfully")
 	return nil
 }
+
+// PopulateInitialCategoryCount updates existing portfolios with their current category count
+// This is a one-time migration to populate the new category_count field
+func PopulateInitialCategoryCount(db *gorm.DB) error {
+	log.Println("Populating initial category_count for existing portfolios...")
+
+	// Update all portfolios with their current category count
+	// Using a subquery to count categories per portfolio
+	result := db.Exec(`
+		UPDATE portfolios
+		SET category_count = (
+			SELECT COUNT(*)
+			FROM categories
+			WHERE categories.portfolio_id = portfolios.id
+			AND categories.deleted_at IS NULL
+		)
+		WHERE portfolios.deleted_at IS NULL
+		AND portfolios.category_count = 0
+	`)
+
+	if result.Error != nil {
+		return fmt.Errorf("failed to populate category_count: %w", result.Error)
+	}
+
+	log.Printf("Updated category_count for %d portfolios\n", result.RowsAffected)
+	return nil
+}
