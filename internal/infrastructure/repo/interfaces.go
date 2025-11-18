@@ -13,6 +13,8 @@ type PortfolioRepository interface {
 	Delete(id uint) error
 	List(limit, offset int) ([]*models2.Portfolio, error)
 	CheckDuplicate(title string, ownerID string, id uint) (bool, error)
+	IncrementCategoryCount(id uint) error
+	DecrementCategoryCount(id uint) error
 }
 
 type ProjectRepository interface {

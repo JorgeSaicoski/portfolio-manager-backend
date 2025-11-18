@@ -82,3 +82,18 @@ func (r *portfolioRepository) CheckDuplicate(title string, ownerID string, id ui
 	}
 	return count > 0, nil
 }
+
+// IncrementCategoryCount atomically increments the category_count for a portfolio
+func (r *portfolioRepository) IncrementCategoryCount(id uint) error {
+	return r.db.Model(&models.Portfolio{}).
+		Where("id = ?", id).
+		UpdateColumn("category_count", gorm.Expr("category_count + ?", 1)).Error
+}
+
+// DecrementCategoryCount atomically decrements the category_count for a portfolio
+func (r *portfolioRepository) DecrementCategoryCount(id uint) error {
+	return r.db.Model(&models.Portfolio{}).
+		Where("id = ?", id).
+		Where("category_count > ?", 0). // Prevent negative counts
+		UpdateColumn("category_count", gorm.Expr("category_count - ?", 1)).Error
+}

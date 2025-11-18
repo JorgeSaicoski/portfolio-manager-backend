@@ -22,7 +22,7 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 	portfolioHandler := handler2.NewPortfolioHandler(portfolioRepo, metrics)
 
 	categoryRepo := repo2.NewCategoryRepository(db)
-	categoryHandler := handler2.NewCategoryHandler(categoryRepo, metrics)
+	categoryHandler := handler2.NewCategoryHandler(categoryRepo, portfolioRepo, metrics)
 
 	projectRepo := repo2.NewProjectRepository(db)
 	projectHandler := handler2.NewProjectHandler(projectRepo, metrics)

@@ -1,9 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
@@ -11,17 +11,20 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type CategoryHandler struct {
-	repo    repo.CategoryRepository
-	metrics *metrics.Collector
+	repo          repo.CategoryRepository
+	portfolioRepo repo.PortfolioRepository
+	metrics       *metrics.Collector
 }
 
-func NewCategoryHandler(repo repo.CategoryRepository, metrics *metrics.Collector) *CategoryHandler {
+func NewCategoryHandler(repo repo.CategoryRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *CategoryHandler {
 	return &CategoryHandler{
-		repo:    repo,
-		metrics: metrics,
+		repo:          repo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -105,33 +108,99 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 func (h *CategoryHandler) Create(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
 
+	// Log initial request
+	logrus.WithFields(logrus.Fields{
+		"userID": userID,
+		"path":   c.Request.URL.Path,
+	}).Info("Category creation request received")
+
 	// Parse request body
 	var newCategory models.Category
 	if err := c.ShouldBindJSON(&newCategory); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+			"error":  err.Error(),
+		}).Error("Failed to parse category creation request")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
+
+	// Log parsed request
+	reqJSON, _ := json.Marshal(newCategory)
+	logrus.WithFields(logrus.Fields{
+		"userID":  userID,
+		"request": string(reqJSON),
+	}).Info("Parsed category creation request")
 
 	// Set the owner
 	newCategory.OwnerID = userID
 
 	// Validate category data
 	if err := validator.ValidateCategory(&newCategory); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+			"error":  err.Error(),
+		}).Error("Category validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"userID":       userID,
+		"title":        newCategory.Title,
+		"portfolio_id": newCategory.PortfolioID,
+	}).Info("Category validation passed, fetching portfolio for position assignment")
+
+	// Fetch portfolio to get current category count
+	portfolio, err := h.portfolioRepo.GetByIDBasic(newCategory.PortfolioID)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newCategory.PortfolioID,
+			"error":        err.Error(),
+		}).Error("Portfolio not found")
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	// Set position based on current category count
+	newCategory.Position = portfolio.CategoryCount + 1
+
+	logrus.WithFields(logrus.Fields{
+		"userID":         userID,
+		"title":          newCategory.Title,
+		"portfolio_id":   newCategory.PortfolioID,
+		"category_count": portfolio.CategoryCount,
+		"new_position":   newCategory.Position,
+	}).Info("Creating category with calculated position")
+
 	// Create category
 	if err := h.repo.Create(&newCategory); err != nil {
-		// Check if error is due to foreign key constraint (invalid portfolio_id)
-		errMsg := err.Error()
-		if strings.Contains(errMsg, "fk_portfolios_categories") || strings.Contains(errMsg, "23503") {
-			response.NotFound(c, "Portfolio not found")
-			return
-		}
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"error":        err.Error(),
+			"portfolio_id": newCategory.PortfolioID,
+		}).Error("Failed to create category")
 		response.InternalError(c, "Failed to create category")
 		return
 	}
+
+	// Increment portfolio's category count
+	if err := h.portfolioRepo.IncrementCategoryCount(newCategory.PortfolioID); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newCategory.PortfolioID,
+			"error":        err.Error(),
+		}).Error("Failed to increment category count")
+		// Category was created but count wasn't incremented - log warning but don't fail
+		// The count will be corrected on next migration run
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"userID":      userID,
+		"categoryID":  newCategory.ID,
+		"title":       newCategory.Title,
+	}).Info("Category created successfully")
 
 	response.Created(c, "category", &newCategory, "Category created successfully")
 }
@@ -146,8 +215,8 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Use basic method - only fetch id and owner_id for authorization
-	category, err := h.repo.GetByIDBasic(uint(id))
+	// Fetch category to check ownership and get portfolio_id
+	category, err := h.repo.GetByID(uint(id))
 	if err != nil {
 		response.NotFound(c, "Category not found")
 		return
@@ -158,9 +227,25 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	// Store portfolio_id before deletion
+	portfolioID := category.PortfolioID
+
+	// Delete category
 	if err := h.repo.Delete(uint(id)); err != nil {
 		response.InternalError(c, "Failed to delete category")
 		return
+	}
+
+	// Decrement portfolio's category count
+	if err := h.portfolioRepo.DecrementCategoryCount(portfolioID); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": portfolioID,
+			"category_id":  id,
+			"error":        err.Error(),
+		}).Error("Failed to decrement category count after deletion")
+		// Category was deleted but count wasn't decremented - log warning but don't fail
+		// The count will be corrected on next migration run
 	}
 
 	response.OK(c, "message", "Category deleted successfully", "Success")

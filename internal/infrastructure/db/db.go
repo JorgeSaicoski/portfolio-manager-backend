@@ -109,6 +109,11 @@ func (d *Database) Migrate() error {
 
 	log.Println("Database migration completed successfully")
 
+	// Populate initial category_count for existing portfolios
+	if err := PopulateInitialCategoryCount(d.DB); err != nil {
+		return fmt.Errorf("failed to populate initial category count: %w", err)
+	}
+
 	// Apply performance indexes
 	if err := ApplyPerformanceIndexes(d.DB); err != nil {
 		return fmt.Errorf("failed to apply performance indexes: %w", err)
