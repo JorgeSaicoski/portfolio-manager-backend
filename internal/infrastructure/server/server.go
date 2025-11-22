@@ -84,7 +84,14 @@ func (s *Server) setupMiddleware() {
 	s.engine.Use(s.corsMiddleware())
 
 	// Performance middleware
-	s.engine.Use(middleware2.Compression())
+	// Skip compression for /metrics endpoint (Prometheus expects plain text)
+	s.engine.Use(func(c *gin.Context) {
+		if c.Request.URL.Path == "/metrics" {
+			c.Next()
+			return
+		}
+		middleware2.Compression()(c)
+	})
 	s.engine.Use(middleware2.HTTPCache())
 
 	s.logger.Info("Security middleware initialized")
