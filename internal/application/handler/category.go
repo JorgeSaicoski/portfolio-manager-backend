@@ -149,32 +149,9 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		"userID":       userID,
 		"title":        newCategory.Title,
 		"portfolio_id": newCategory.PortfolioID,
-	}).Info("Category validation passed, fetching portfolio for position assignment")
+	}).Info("Creating category - position will be set by database trigger")
 
-	// Fetch portfolio to get current category count
-	portfolio, err := h.portfolioRepo.GetByIDBasic(newCategory.PortfolioID)
-	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"portfolio_id": newCategory.PortfolioID,
-			"error":        err.Error(),
-		}).Error("Portfolio not found")
-		response.NotFound(c, "Portfolio not found")
-		return
-	}
-
-	// Set position based on current category count
-	newCategory.Position = portfolio.CategoryCount + 1
-
-	logrus.WithFields(logrus.Fields{
-		"userID":         userID,
-		"title":          newCategory.Title,
-		"portfolio_id":   newCategory.PortfolioID,
-		"category_count": portfolio.CategoryCount,
-		"new_position":   newCategory.Position,
-	}).Info("Creating category with calculated position")
-
-	// Create category
+	// Create category (position is automatically set by database trigger)
 	if err := h.repo.Create(&newCategory); err != nil {
 		logrus.WithFields(logrus.Fields{
 			"userID":       userID,
@@ -185,21 +162,10 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Increment portfolio's category count
-	if err := h.portfolioRepo.IncrementCategoryCount(newCategory.PortfolioID); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"portfolio_id": newCategory.PortfolioID,
-			"error":        err.Error(),
-		}).Error("Failed to increment category count")
-		// Category was created but count wasn't incremented - log warning but don't fail
-		// The count will be corrected on next migration run
-	}
-
 	logrus.WithFields(logrus.Fields{
-		"userID":      userID,
-		"categoryID":  newCategory.ID,
-		"title":       newCategory.Title,
+		"userID":     userID,
+		"categoryID": newCategory.ID,
+		"title":      newCategory.Title,
 	}).Info("Category created successfully")
 
 	response.Created(c, "category", &newCategory, "Category created successfully")
@@ -227,25 +193,10 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Store portfolio_id before deletion
-	portfolioID := category.PortfolioID
-
 	// Delete category
 	if err := h.repo.Delete(uint(id)); err != nil {
 		response.InternalError(c, "Failed to delete category")
 		return
-	}
-
-	// Decrement portfolio's category count
-	if err := h.portfolioRepo.DecrementCategoryCount(portfolioID); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"portfolio_id": portfolioID,
-			"category_id":  id,
-			"error":        err.Error(),
-		}).Error("Failed to decrement category count after deletion")
-		// Category was deleted but count wasn't decremented - log warning but don't fail
-		// The count will be corrected on next migration run
 	}
 
 	response.OK(c, "message", "Category deleted successfully", "Success")

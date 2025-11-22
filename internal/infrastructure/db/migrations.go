@@ -74,6 +74,15 @@ func ApplyPerformanceIndexes(db *gorm.DB) error {
 		return fmt.Errorf("failed to create composite index on projects(category_id, position): %w", err)
 	}
 
+	// Composite index for categories ordered by position within a portfolio
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_categories_portfolio_position
+		ON categories(portfolio_id, position)
+		WHERE deleted_at IS NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create composite index on categories(portfolio_id, position): %w", err)
+	}
+
 	// Composite index for section_contents ordered within a section
 	if err := db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_section_contents_section_order
@@ -105,29 +114,83 @@ func ApplyPerformanceIndexes(db *gorm.DB) error {
 	return nil
 }
 
-// PopulateInitialCategoryCount updates existing portfolios with their current category count
-// This is a one-time migration to populate the new category_count field
-func PopulateInitialCategoryCount(db *gorm.DB) error {
-	log.Println("Populating initial category_count for existing portfolios...")
+// CreateCategoryPositionTrigger creates a database trigger to automatically set
+// the position field for new categories based on the current maximum position
+// within the same portfolio. This ensures proper ordering without race conditions.
+func CreateCategoryPositionTrigger(db *gorm.DB) error {
+	log.Println("Creating category position trigger...")
 
-	// Update all portfolios with their current category count
-	// Using a subquery to count categories per portfolio
-	result := db.Exec(`
-		UPDATE portfolios
-		SET category_count = (
-			SELECT COUNT(*)
-			FROM categories
-			WHERE categories.portfolio_id = portfolios.id
-			AND categories.deleted_at IS NULL
-		)
-		WHERE portfolios.deleted_at IS NULL
-		AND portfolios.category_count = 0
-	`)
-
-	if result.Error != nil {
-		return fmt.Errorf("failed to populate category_count: %w", result.Error)
+	// Create the trigger function
+	if err := db.Exec(`
+		CREATE OR REPLACE FUNCTION set_category_position()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			-- Only set position if it's NULL or 0
+			IF NEW.position IS NULL OR NEW.position = 0 THEN
+				SELECT COALESCE(MAX(position) + 1, 1) INTO NEW.position
+				FROM categories
+				WHERE portfolio_id = NEW.portfolio_id
+				AND deleted_at IS NULL;
+			END IF;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create set_category_position function: %w", err)
 	}
 
-	log.Printf("Updated category_count for %d portfolios\n", result.RowsAffected)
+	// Drop trigger if it exists and create it
+	if err := db.Exec(`
+		DROP TRIGGER IF EXISTS before_insert_category ON categories;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to drop existing trigger: %w", err)
+	}
+
+	if err := db.Exec(`
+		CREATE TRIGGER before_insert_category
+		BEFORE INSERT ON categories
+		FOR EACH ROW
+		EXECUTE FUNCTION set_category_position();
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create before_insert_category trigger: %w", err)
+	}
+
+	log.Println("Category position trigger created successfully")
+	return nil
+}
+
+// DropCategoryCountColumn removes the category_count field from portfolios table
+// This field is redundant and can cause sync issues; position is now managed by trigger
+func DropCategoryCountColumn(db *gorm.DB) error {
+	log.Println("Dropping category_count column from portfolios table...")
+
+	// Check if column exists before dropping
+	var columnExists bool
+	err := db.Raw(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM information_schema.columns
+			WHERE table_name = 'portfolios'
+			AND column_name = 'category_count'
+		)
+	`).Scan(&columnExists).Error
+
+	if err != nil {
+		return fmt.Errorf("failed to check if category_count column exists: %w", err)
+	}
+
+	if !columnExists {
+		log.Println("category_count column does not exist, skipping drop")
+		return nil
+	}
+
+	// Drop the column
+	if err := db.Exec(`
+		ALTER TABLE portfolios DROP COLUMN IF EXISTS category_count;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to drop category_count column: %w", err)
+	}
+
+	log.Println("category_count column dropped successfully")
 	return nil
 }

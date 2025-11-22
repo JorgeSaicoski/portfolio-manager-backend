@@ -109,14 +109,19 @@ func (d *Database) Migrate() error {
 
 	log.Println("Database migration completed successfully")
 
-	// Populate initial category_count for existing portfolios
-	if err := PopulateInitialCategoryCount(d.DB); err != nil {
-		return fmt.Errorf("failed to populate initial category count: %w", err)
-	}
-
-	// Apply performance indexes
+	// Apply performance indexes (includes composite index for categories)
 	if err := ApplyPerformanceIndexes(d.DB); err != nil {
 		return fmt.Errorf("failed to apply performance indexes: %w", err)
+	}
+
+	// Create trigger for automatic category position assignment
+	if err := CreateCategoryPositionTrigger(d.DB); err != nil {
+		return fmt.Errorf("failed to create category position trigger: %w", err)
+	}
+
+	// Drop the redundant category_count column from portfolios
+	if err := DropCategoryCountColumn(d.DB); err != nil {
+		return fmt.Errorf("failed to drop category_count column: %w", err)
 	}
 
 	return nil
