@@ -145,6 +145,27 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		return
 	}
 
+	// Validate that the portfolio exists and belongs to the user
+	portfolio, err := h.portfolioRepo.GetByIDBasic(newCategory.PortfolioID)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newCategory.PortfolioID,
+		}).Error("Portfolio not found")
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newCategory.PortfolioID,
+			"owner_id":     portfolio.OwnerID,
+		}).Error("Access denied to portfolio")
+		response.Forbidden(c, "Access denied")
+		return
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"userID":       userID,
 		"title":        newCategory.Title,
