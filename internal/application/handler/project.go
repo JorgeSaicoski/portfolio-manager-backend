@@ -10,6 +10,7 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type ProjectHandler struct {

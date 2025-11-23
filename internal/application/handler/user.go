@@ -50,7 +50,7 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	}).Info("Starting user data cleanup")
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerID(userID)
+	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
 			"userID": userID,
@@ -111,7 +111,7 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	}
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerID(userID)
+	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve user data",

@@ -10,6 +10,7 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type SectionHandler struct {
@@ -114,6 +115,12 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	// Set the owner
 	newSection.OwnerID = userID
 
+	// Validate section data first (includes portfolioID check)
+	if err := validator.ValidateSection(&newSection); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
 	// Validate portfolio exists and belongs to user
 	portfolio, err := h.portfolioRepo.GetByIDBasic(newSection.PortfolioID)
 	if err != nil {
@@ -123,12 +130,6 @@ func (h *SectionHandler) Create(c *gin.Context) {
 
 	if portfolio.OwnerID != userID {
 		response.Forbidden(c, "Access denied: portfolio belongs to another user")
-		return
-	}
-
-	// Validate section data
-	if err := validator.ValidateSection(&newSection); err != nil {
-		response.BadRequest(c, err.Error())
 		return
 	}
 
