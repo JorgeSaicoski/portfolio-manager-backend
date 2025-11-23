@@ -1,11 +1,14 @@
 package main
 
 import (
+	"io"
 	"os"
+	"path/filepath"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/sirupsen/logrus"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
@@ -45,6 +48,25 @@ func setupLogger() *logrus.Logger {
 
 	if parsedLevel, err := logrus.ParseLevel(level); err == nil {
 		logger.SetLevel(parsedLevel)
+	}
+
+	// Create audit directory if it doesn't exist
+	auditDir := filepath.Join(".", "audit")
+	if err := os.MkdirAll(auditDir, 0755); err != nil {
+		logger.WithError(err).Error("Failed to create audit directory")
+	} else {
+		// Setup file logging with rotation
+		logFile := &lumberjack.Logger{
+			Filename:   filepath.Join(auditDir, "audit.log"),
+			MaxSize:    10, // megabytes
+			MaxBackups: 30, // keep 30 old log files
+			MaxAge:     90, // days
+			Compress:   true,
+		}
+
+		// Write to both stdout and file
+		multiWriter := io.MultiWriter(os.Stdout, logFile)
+		logger.SetOutput(multiWriter)
 	}
 
 	return logger

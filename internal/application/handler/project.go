@@ -10,17 +10,22 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type ProjectHandler struct {
-	repo    repo.ProjectRepository
-	metrics *metrics.Collector
+	repo          repo.ProjectRepository
+	categoryRepo  repo.CategoryRepository
+	portfolioRepo repo.PortfolioRepository
+	metrics       *metrics.Collector
 }
 
-func NewProjectHandler(repo repo.ProjectRepository, metrics *metrics.Collector) *ProjectHandler {
+func NewProjectHandler(repo repo.ProjectRepository, categoryRepo repo.CategoryRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *ProjectHandler {
 	return &ProjectHandler{
-		repo:    repo,
-		metrics: metrics,
+		repo:          repo,
+		categoryRepo:  categoryRepo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -100,9 +105,27 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Set the owner
 	newProject.OwnerID = userID
 
-	// Validate project data
+	// Validate project data first (includes categoryID check)
 	if err := validator.ValidateProject(&newProject); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Validate category exists and belongs to user's portfolio
+	category, err := h.categoryRepo.GetByID(newProject.CategoryID)
+	if err != nil {
+		response.NotFound(c, "Category not found")
+		return
+	}
+
+	portfolio, err := h.portfolioRepo.GetByIDBasic(category.PortfolioID)
+	if err != nil {
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		response.Forbidden(c, "Access denied: category belongs to another user's portfolio")
 		return
 	}
 
@@ -220,9 +243,23 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"projectID":  id,
+			"userID":     userID,
+			"categoryID": project.CategoryID,
+			"error":      err.Error(),
+		}).Error("Failed to delete project")
+
 		response.InternalError(c, "Failed to delete project")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"projectID":  id,
+		"userID":     userID,
+		"categoryID": project.CategoryID,
+		"title":      project.Title,
+	}).Info("Project deleted successfully")
 
 	response.OK(c, "message", "Project deleted successfully", "Success")
 }

@@ -214,11 +214,25 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	// Delete category
+	// Delete category (CASCADE: all related projects will be deleted)
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"categoryID":  id,
+			"userID":      userID,
+			"portfolioID": category.PortfolioID,
+			"error":       err.Error(),
+		}).Error("Failed to delete category")
+
 		response.InternalError(c, "Failed to delete category")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"categoryID":  id,
+		"userID":      userID,
+		"portfolioID": category.PortfolioID,
+		"title":       category.Title,
+	}).Info("Category deleted successfully (CASCADE: all related projects)")
 
 	response.OK(c, "message", "Category deleted successfully", "Success")
 }

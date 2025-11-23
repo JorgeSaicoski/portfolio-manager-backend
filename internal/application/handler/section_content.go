@@ -11,19 +11,22 @@ import (
 	resp "github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type SectionContentHandler struct {
-	repo        repo.SectionContentRepository
-	sectionRepo repo.SectionRepository // For authorization checks
-	metrics     *metrics.Collector
+	repo          repo.SectionContentRepository
+	sectionRepo   repo.SectionRepository   // For authorization checks
+	portfolioRepo repo.PortfolioRepository // For full ownership validation
+	metrics       *metrics.Collector
 }
 
-func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, metrics *metrics.Collector) *SectionContentHandler {
+func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionContentHandler {
 	return &SectionContentHandler{
-		repo:        repo,
-		sectionRepo: sectionRepo,
-		metrics:     metrics,
+		repo:          repo,
+		sectionRepo:   sectionRepo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -38,15 +41,21 @@ func (h *SectionContentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Check if section exists and belongs to user
+	// Check if section exists and belongs to user's portfolio
 	section, err := h.sectionRepo.GetByID(req.SectionID)
 	if err != nil {
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
-	if section.OwnerID != userID {
-		resp.Forbidden(c, "Access denied")
+	portfolio, err := h.portfolioRepo.GetByIDBasic(section.PortfolioID)
+	if err != nil {
+		resp.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		resp.Forbidden(c, "Access denied: section belongs to another user's portfolio")
 		return
 	}
 
@@ -269,9 +278,23 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 
 	// Delete content
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"contentID": id,
+			"userID":    userID,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Error("Failed to delete section content")
+
 		resp.InternalError(c, "Failed to delete content")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"contentID": id,
+		"userID":    userID,
+		"sectionID": existing.SectionID,
+		"type":      existing.Type,
+	}).Info("Section content deleted successfully")
 
 	resp.OK(c, "message", "Content deleted successfully", "Success")
 }

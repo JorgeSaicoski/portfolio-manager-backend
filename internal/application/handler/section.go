@@ -10,17 +10,20 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/validator"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type SectionHandler struct {
-	repo    repo.SectionRepository
-	metrics *metrics.Collector
+	repo          repo.SectionRepository
+	portfolioRepo repo.PortfolioRepository
+	metrics       *metrics.Collector
 }
 
-func NewSectionHandler(repo repo.SectionRepository, metrics *metrics.Collector) *SectionHandler {
+func NewSectionHandler(repo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionHandler {
 	return &SectionHandler{
-		repo:    repo,
-		metrics: metrics,
+		repo:          repo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -112,9 +115,21 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	// Set the owner
 	newSection.OwnerID = userID
 
-	// Validate section data
+	// Validate section data first (includes portfolioID check)
 	if err := validator.ValidateSection(&newSection); err != nil {
 		response.BadRequest(c, err.Error())
+		return
+	}
+
+	// Validate portfolio exists and belongs to user
+	portfolio, err := h.portfolioRepo.GetByIDBasic(newSection.PortfolioID)
+	if err != nil {
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		response.Forbidden(c, "Access denied: portfolio belongs to another user")
 		return
 	}
 
@@ -231,10 +246,25 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	// Delete section (CASCADE: all related section_contents will be deleted)
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"sectionID":   id,
+			"userID":      userID,
+			"portfolioID": section.PortfolioID,
+			"error":       err.Error(),
+		}).Error("Failed to delete section")
+
 		response.InternalError(c, "Failed to delete section")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"sectionID":   id,
+		"userID":      userID,
+		"portfolioID": section.PortfolioID,
+		"title":       section.Title,
+	}).Info("Section deleted successfully (CASCADE: all related section_contents)")
 
 	response.OK(c, "message", "Section deleted successfully", "Success")
 }
