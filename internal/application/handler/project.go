@@ -105,6 +105,12 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Set the owner
 	newProject.OwnerID = userID
 
+	// Validate project data first (includes categoryID check)
+	if err := validator.ValidateProject(&newProject); err != nil {
+		response.BadRequest(c, err.Error())
+		return
+	}
+
 	// Validate category exists and belongs to user's portfolio
 	category, err := h.categoryRepo.GetByID(newProject.CategoryID)
 	if err != nil {
@@ -120,12 +126,6 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 
 	if portfolio.OwnerID != userID {
 		response.Forbidden(c, "Access denied: category belongs to another user's portfolio")
-		return
-	}
-
-	// Validate project data
-	if err := validator.ValidateProject(&newProject); err != nil {
-		response.BadRequest(c, err.Error())
 		return
 	}
 
