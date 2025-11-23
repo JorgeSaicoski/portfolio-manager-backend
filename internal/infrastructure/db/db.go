@@ -124,6 +124,11 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("failed to drop category_count column: %w", err)
 	}
 
+	// Add CASCADE DELETE constraints to foreign keys
+	if err := AddCascadeDeleteConstraints(d.DB); err != nil {
+		return fmt.Errorf("failed to add CASCADE DELETE constraints: %w", err)
+	}
+
 	return nil
 }
 

@@ -194,3 +194,105 @@ func DropCategoryCountColumn(db *gorm.DB) error {
 	log.Println("category_count column dropped successfully")
 	return nil
 }
+
+// AddCascadeDeleteConstraints adds ON DELETE CASCADE to all foreign key relationships
+// This ensures orphaned data is automatically cleaned up when parent records are deleted.
+// Fixes issue where deleting a portfolio leaves orphaned categories, sections, and projects.
+func AddCascadeDeleteConstraints(db *gorm.DB) error {
+	log.Println("Adding CASCADE DELETE constraints to foreign keys...")
+
+	// Step 1: Drop existing foreign key constraints without CASCADE
+	constraints := []struct {
+		table      string
+		constraint string
+		column     string
+		refTable   string
+		refColumn  string
+	}{
+		// Categories -> Portfolios
+		{
+			table:      "categories",
+			constraint: "fk_categories_portfolio",
+			column:     "portfolio_id",
+			refTable:   "portfolios",
+			refColumn:  "id",
+		},
+		// Sections -> Portfolios
+		{
+			table:      "sections",
+			constraint: "fk_sections_portfolio",
+			column:     "portfolio_id",
+			refTable:   "portfolios",
+			refColumn:  "id",
+		},
+		// Projects -> Categories
+		{
+			table:      "projects",
+			constraint: "fk_projects_category",
+			column:     "category_id",
+			refTable:   "categories",
+			refColumn:  "id",
+		},
+		// SectionContent -> Sections (already has CASCADE, but update for consistency)
+		{
+			table:      "section_contents",
+			constraint: "fk_section_contents_section",
+			column:     "section_id",
+			refTable:   "sections",
+			refColumn:  "id",
+		},
+	}
+
+	for _, fk := range constraints {
+		// Check if the constraint exists
+		var constraintExists bool
+		err := db.Raw(`
+			SELECT EXISTS (
+				SELECT 1
+				FROM information_schema.table_constraints
+				WHERE constraint_name = ?
+				AND table_name = ?
+			)
+		`, fk.constraint, fk.table).Scan(&constraintExists).Error
+
+		if err != nil {
+			log.Printf("Warning: failed to check if constraint %s exists: %v", fk.constraint, err)
+			// Continue to try dropping anyway
+		}
+
+		// Drop the old constraint if it exists
+		log.Printf("Dropping old constraint %s on table %s...", fk.constraint, fk.table)
+		if err := db.Exec(fmt.Sprintf(`
+			ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s
+		`, fk.table, fk.constraint)).Error; err != nil {
+			log.Printf("Warning: failed to drop constraint %s: %v (may not exist)", fk.constraint, err)
+			// Continue - constraint may not exist
+		}
+
+		// Also try to drop GORM's auto-generated constraint names
+		gormConstraint := fmt.Sprintf("fk_%s_%s", fk.table, fk.column)
+		log.Printf("Dropping GORM constraint %s on table %s...", gormConstraint, fk.table)
+		if err := db.Exec(fmt.Sprintf(`
+			ALTER TABLE %s DROP CONSTRAINT IF EXISTS %s
+		`, fk.table, gormConstraint)).Error; err != nil {
+			log.Printf("Warning: failed to drop GORM constraint %s: %v (may not exist)", gormConstraint, err)
+			// Continue - constraint may not exist
+		}
+
+		// Add the new constraint with CASCADE DELETE
+		log.Printf("Adding CASCADE constraint %s to table %s...", fk.constraint, fk.table)
+		if err := db.Exec(fmt.Sprintf(`
+			ALTER TABLE %s
+			ADD CONSTRAINT %s
+			FOREIGN KEY (%s)
+			REFERENCES %s(%s)
+			ON DELETE CASCADE
+		`, fk.table, fk.constraint, fk.column, fk.refTable, fk.refColumn)).Error; err != nil {
+			return fmt.Errorf("failed to add CASCADE constraint %s on %s: %w", fk.constraint, fk.table, err)
+		}
+	}
+
+	log.Println("CASCADE DELETE constraints added successfully")
+	log.Println("Migration complete: Deleting a portfolio will now cascade delete all related categories, sections, projects, and section_contents")
+	return nil
+}

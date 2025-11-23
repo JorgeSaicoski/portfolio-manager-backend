@@ -151,9 +151,9 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 		// Log the raw request body for debugging
 		bodyBytes, _ := c.GetRawData()
 		logrus.WithFields(logrus.Fields{
-			"error":       err.Error(),
-			"raw_body":    string(bodyBytes),
-			"userID":      userID,
+			"error":    err.Error(),
+			"raw_body": string(bodyBytes),
+			"userID":   userID,
 		}).Error("Failed to parse portfolio creation request")
 
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
@@ -281,11 +281,23 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"portfolioID": id,
+			"userID":      userID,
+			"error":       err.Error(),
+		}).Error("Failed to delete portfolio")
+
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error: "Failed to delete portfolio",
 		})
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": id,
+		"userID":      userID,
+		"title":       portfolio.Title,
+	}).Info("Portfolio deleted successfully (CASCADE: all related categories, sections, and projects)")
 
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Message: "Portfolio deleted successfully",

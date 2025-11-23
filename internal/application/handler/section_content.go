@@ -269,9 +269,23 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 
 	// Delete content
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"contentID": id,
+			"userID":    userID,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Error("Failed to delete section content")
+
 		resp.InternalError(c, "Failed to delete content")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"contentID": id,
+		"userID":    userID,
+		"sectionID": existing.SectionID,
+		"type":      existing.Type,
+	}).Info("Section content deleted successfully")
 
 	resp.OK(c, "message", "Content deleted successfully", "Success")
 }

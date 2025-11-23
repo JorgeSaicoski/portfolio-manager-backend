@@ -220,9 +220,23 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"projectID":  id,
+			"userID":     userID,
+			"categoryID": project.CategoryID,
+			"error":      err.Error(),
+		}).Error("Failed to delete project")
+
 		response.InternalError(c, "Failed to delete project")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"projectID":  id,
+		"userID":     userID,
+		"categoryID": project.CategoryID,
+		"title":      project.Title,
+	}).Info("Project deleted successfully")
 
 	response.OK(c, "message", "Project deleted successfully", "Success")
 }

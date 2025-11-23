@@ -231,10 +231,25 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 		return
 	}
 
+	// Delete section (CASCADE: all related section_contents will be deleted)
 	if err := h.repo.Delete(uint(id)); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"sectionID":   id,
+			"userID":      userID,
+			"portfolioID": section.PortfolioID,
+			"error":       err.Error(),
+		}).Error("Failed to delete section")
+
 		response.InternalError(c, "Failed to delete section")
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"sectionID":   id,
+		"userID":      userID,
+		"portfolioID": section.PortfolioID,
+		"title":       section.Title,
+	}).Info("Section deleted successfully (CASCADE: all related section_contents)")
 
 	response.OK(c, "message", "Section deleted successfully", "Success")
 }
