@@ -13,14 +13,16 @@ import (
 )
 
 type SectionHandler struct {
-	repo    repo.SectionRepository
-	metrics *metrics.Collector
+	repo          repo.SectionRepository
+	portfolioRepo repo.PortfolioRepository
+	metrics       *metrics.Collector
 }
 
-func NewSectionHandler(repo repo.SectionRepository, metrics *metrics.Collector) *SectionHandler {
+func NewSectionHandler(repo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionHandler {
 	return &SectionHandler{
-		repo:    repo,
-		metrics: metrics,
+		repo:          repo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -111,6 +113,18 @@ func (h *SectionHandler) Create(c *gin.Context) {
 
 	// Set the owner
 	newSection.OwnerID = userID
+
+	// Validate portfolio exists and belongs to user
+	portfolio, err := h.portfolioRepo.GetByIDBasic(newSection.PortfolioID)
+	if err != nil {
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		response.Forbidden(c, "Access denied: portfolio belongs to another user")
+		return
+	}
 
 	// Validate section data
 	if err := validator.ValidateSection(&newSection); err != nil {

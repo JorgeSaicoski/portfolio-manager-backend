@@ -14,16 +14,18 @@ import (
 )
 
 type SectionContentHandler struct {
-	repo        repo.SectionContentRepository
-	sectionRepo repo.SectionRepository // For authorization checks
-	metrics     *metrics.Collector
+	repo          repo.SectionContentRepository
+	sectionRepo   repo.SectionRepository   // For authorization checks
+	portfolioRepo repo.PortfolioRepository // For full ownership validation
+	metrics       *metrics.Collector
 }
 
-func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, metrics *metrics.Collector) *SectionContentHandler {
+func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionContentHandler {
 	return &SectionContentHandler{
-		repo:        repo,
-		sectionRepo: sectionRepo,
-		metrics:     metrics,
+		repo:          repo,
+		sectionRepo:   sectionRepo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -38,15 +40,21 @@ func (h *SectionContentHandler) Create(c *gin.Context) {
 		return
 	}
 
-	// Check if section exists and belongs to user
+	// Check if section exists and belongs to user's portfolio
 	section, err := h.sectionRepo.GetByID(req.SectionID)
 	if err != nil {
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
-	if section.OwnerID != userID {
-		resp.Forbidden(c, "Access denied")
+	portfolio, err := h.portfolioRepo.GetByIDBasic(section.PortfolioID)
+	if err != nil {
+		resp.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		resp.Forbidden(c, "Access denied: section belongs to another user's portfolio")
 		return
 	}
 

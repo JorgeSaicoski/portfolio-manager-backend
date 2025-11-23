@@ -13,14 +13,18 @@ import (
 )
 
 type ProjectHandler struct {
-	repo    repo.ProjectRepository
-	metrics *metrics.Collector
+	repo          repo.ProjectRepository
+	categoryRepo  repo.CategoryRepository
+	portfolioRepo repo.PortfolioRepository
+	metrics       *metrics.Collector
 }
 
-func NewProjectHandler(repo repo.ProjectRepository, metrics *metrics.Collector) *ProjectHandler {
+func NewProjectHandler(repo repo.ProjectRepository, categoryRepo repo.CategoryRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *ProjectHandler {
 	return &ProjectHandler{
-		repo:    repo,
-		metrics: metrics,
+		repo:          repo,
+		categoryRepo:  categoryRepo,
+		portfolioRepo: portfolioRepo,
+		metrics:       metrics,
 	}
 }
 
@@ -99,6 +103,24 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 
 	// Set the owner
 	newProject.OwnerID = userID
+
+	// Validate category exists and belongs to user's portfolio
+	category, err := h.categoryRepo.GetByID(newProject.CategoryID)
+	if err != nil {
+		response.NotFound(c, "Category not found")
+		return
+	}
+
+	portfolio, err := h.portfolioRepo.GetByIDBasic(category.PortfolioID)
+	if err != nil {
+		response.NotFound(c, "Portfolio not found")
+		return
+	}
+
+	if portfolio.OwnerID != userID {
+		response.Forbidden(c, "Access denied: category belongs to another user's portfolio")
+		return
+	}
 
 	// Validate project data
 	if err := validator.ValidateProject(&newProject); err != nil {
