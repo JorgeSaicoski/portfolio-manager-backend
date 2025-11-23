@@ -22,7 +22,7 @@ func (r *categoryRepository) Create(category *models.Category) error {
 // GetByID For basic category info
 func (r *categoryRepository) GetByID(id uint) (*models.Category, error) {
 	var category models.Category
-	err := r.db.Select("id, title, description, owner_id, portfolio_id, created_at, updated_at").
+	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("id = ?", id).
 		First(&category).Error
 	return &category, err
@@ -91,7 +91,7 @@ func (r *categoryRepository) List(limit, offset int) ([]*models.Category, error)
 // GetByOwnerIDBasic For list views - categories owned by user
 func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Category, error) {
 	var categories []*models.Category
-	err := r.db.Select("id, title, description, owner_id, portfolio_id, created_at, updated_at").
+	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
 		Find(&categories).Error
