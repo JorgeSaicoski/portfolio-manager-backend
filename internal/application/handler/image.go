@@ -13,6 +13,7 @@ import (
 	dtoResponse "github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/dto/response"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
 )
 
 type ImageHandler struct {
@@ -91,14 +92,18 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	}
 
 	// Audit log
-	audit.Logger.Info("Image uploaded",
-		"user_id", userID,
-		"image_id", image.ID,
-		"entity_type", req.EntityType,
-		"entity_id", req.EntityID,
-		"filename", header.Filename,
-		"file_size", header.Size,
-		"mime_type", header.Header.Get("Content-Type"))
+	audit.GetCreateLogger().WithFields(logrus.Fields{
+		"operation":  "CREATE_IMAGE",
+		"userID":     userID,
+		"imageID":    image.ID,
+		"entityType": req.EntityType,
+		"entityID":   req.EntityID,
+		"filename":   header.Filename,
+		"fileSize":   header.Size,
+		"mimeType":   header.Header.Get("Content-Type"),
+		"alt":        req.Alt,
+		"isMain":     req.IsMain,
+	}).Info("Image uploaded successfully")
 
 	// Metrics
 	h.metrics.IncImagesUploaded()
@@ -215,10 +220,14 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 
 	// Audit log
 	if len(changes) > 0 {
-		audit.Logger.Info("Image updated",
-			"user_id", userID,
-			"image_id", imageID,
-			"changes", changes)
+		audit.GetUpdateLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_IMAGE",
+			"userID":     userID,
+			"imageID":    imageID,
+			"entityType": image.EntityType,
+			"entityID":   image.EntityID,
+			"changes":    changes,
+		}).Info("Image updated successfully")
 	}
 
 	response.OK(c, "image", dtoResponse.ToImageResponse(image), "Image updated successfully")
@@ -262,19 +271,28 @@ func (h *ImageHandler) DeleteImage(c *gin.Context) {
 	// Delete files from filesystem
 	if err := DeleteImageFiles(image.URL, image.ThumbnailURL); err != nil {
 		// Log error but don't fail the request since DB record is already deleted
-		audit.Logger.Error("Failed to delete image files",
-			"user_id", userID,
-			"image_id", imageID,
-			"error", err)
+		audit.GetDeleteLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_IMAGE_FILES_ERROR",
+			"userID":     userID,
+			"imageID":    imageID,
+			"filename":   image.FileName,
+			"entityType": image.EntityType,
+			"entityID":   image.EntityID,
+			"error":      err.Error(),
+		}).Error("Failed to delete image files from filesystem")
 	}
 
 	// Audit log
-	audit.Logger.Info("Image deleted",
-		"user_id", userID,
-		"image_id", imageID,
-		"filename", image.FileName,
-		"entity_type", image.EntityType,
-		"entity_id", image.EntityID)
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation":  "DELETE_IMAGE",
+		"userID":     userID,
+		"imageID":    imageID,
+		"filename":   image.FileName,
+		"entityType": image.EntityType,
+		"entityID":   image.EntityID,
+		"fileSize":   image.FileSize,
+		"mimeType":   image.MimeType,
+	}).Info("Image deleted successfully")
 
 	// Metrics
 	h.metrics.IncImagesDeleted()
