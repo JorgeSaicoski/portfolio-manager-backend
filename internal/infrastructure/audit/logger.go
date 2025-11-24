@@ -7,7 +7,6 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
@@ -68,12 +67,13 @@ func setupAuditLogger(filename string) *logrus.Logger {
 
 	logFilePath := filepath.Join(auditDir, filename)
 
-	logFile := &lumberjack.Logger{
-		Filename:   logFilePath,
-		MaxSize:    10, // megabytes
-		MaxBackups: 30, // keep 30 old log files
-		MaxAge:     90, // days
-		Compress:   true,
+	// Open file directly with append mode
+	logFile, err := os.OpenFile(logFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// If we can't open the file, log to stderr
+		logger.SetOutput(os.Stderr)
+		logger.WithError(err).Errorf("Failed to open audit log file: %s", logFilePath)
+		return logger
 	}
 
 	// Write to BOTH stdout and file
