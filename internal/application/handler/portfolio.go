@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/dto"
@@ -131,6 +132,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 		return
 	}
 
+	// Audit log for update operation
+	audit.GetUpdateLogger().WithFields(logrus.Fields{
+		"operation":   "UPDATE_PORTFOLIO",
+		"portfolioID": updateData.ID,
+		"title":       updateData.Title,
+		"userID":      userID,
+	}).Info("Portfolio updated successfully")
+
 	c.JSON(http.StatusOK, dto.SuccessResponse{
 		Message: "Portfolio updated successfully",
 		Data:    dtoresponse.ToPortfolioResponse(&updateData),
@@ -240,7 +249,9 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	// Audit log for create operation
+	audit.GetCreateLogger().WithFields(logrus.Fields{
+		"operation":   "CREATE_PORTFOLIO",
 		"portfolioID": newPortfolio.ID,
 		"title":       newPortfolio.Title,
 		"userID":      userID,
@@ -293,10 +304,13 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	// Audit log for delete operation
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation":   "DELETE_PORTFOLIO",
 		"portfolioID": id,
 		"userID":      userID,
 		"title":       portfolio.Title,
+		"cascade":     "categories, sections, projects",
 	}).Info("Portfolio deleted successfully (CASCADE: all related categories, sections, and projects)")
 
 	c.JSON(http.StatusOK, dto.SuccessResponse{

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
@@ -254,7 +255,8 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation":  "DELETE_PROJECT",
 		"projectID":  id,
 		"userID":     userID,
 		"categoryID": project.CategoryID,

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
@@ -259,11 +260,13 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation":   "DELETE_SECTION",
 		"sectionID":   id,
 		"userID":      userID,
 		"portfolioID": section.PortfolioID,
 		"title":       section.Title,
+		"cascade":     "section_contents",
 	}).Info("Section deleted successfully (CASCADE: all related section_contents)")
 
 	response.OK(c, "message", "Section deleted successfully", "Success")
