@@ -24,8 +24,8 @@ FROM docker.io/alpine:3.20
 
 # Install runtime dependencies
 RUN apk --no-cache add ca-certificates wget && \
-    addgroup -g 1001 -S appgroup && \
-    adduser -u 1001 -S appuser -G appgroup
+    addgroup -g 1000 -S appgroup && \
+    adduser -u 1000 -S appuser -G appgroup
 
 WORKDIR /app
 
@@ -34,8 +34,9 @@ COPY --from=builder /app/backend-service .
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Change ownership
-RUN chown -R appuser:appgroup /app
+# Create audit directory with correct permissions
+RUN mkdir -p /app/audit && \
+    chown -R appuser:appgroup /app
 
 # Switch to non-root user
 USER appuser

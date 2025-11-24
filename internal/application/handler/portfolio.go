@@ -251,16 +251,12 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 	}
 
 	// Audit log for create operation
-	fmt.Printf("[DEBUG] About to call audit.GetCreateLogger() for portfolio ID: %d\n", newPortfolio.ID)
-	logger := audit.GetCreateLogger()
-	fmt.Printf("[DEBUG] Got CreateLogger, about to write audit log\n")
-	logger.WithFields(logrus.Fields{
+	audit.GetCreateLogger().WithFields(logrus.Fields{
 		"operation":   "CREATE_PORTFOLIO",
 		"portfolioID": newPortfolio.ID,
 		"title":       newPortfolio.Title,
 		"userID":      userID,
 	}).Info("Portfolio created successfully")
-	fmt.Printf("[DEBUG] Audit log written for portfolio ID: %d\n", newPortfolio.ID)
 
 	c.JSON(http.StatusCreated, dto.SuccessResponse{
 		Message: "Portfolio created successfully",
