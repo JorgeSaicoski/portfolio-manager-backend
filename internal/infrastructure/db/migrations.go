@@ -296,3 +296,56 @@ func AddCascadeDeleteConstraints(db *gorm.DB) error {
 	log.Println("Migration complete: Deleting a portfolio will now cascade delete all related categories, sections, projects, and section_contents")
 	return nil
 }
+
+// ApplyImageIndexes adds database indexes for the images table
+func ApplyImageIndexes(db *gorm.DB) error {
+	log.Println("Applying image table indexes...")
+
+	// Index on images.entity_type for faster polymorphic queries
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_images_entity_type
+		ON images(entity_type)
+		WHERE deleted_at IS NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create index on images.entity_type: %w", err)
+	}
+
+	// Index on images.entity_id for faster polymorphic queries
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_images_entity_id
+		ON images(entity_id)
+		WHERE deleted_at IS NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create index on images.entity_id: %w", err)
+	}
+
+	// Index on images.owner_id for faster owner-based queries
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_images_owner_id
+		ON images(owner_id)
+		WHERE deleted_at IS NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create index on images.owner_id: %w", err)
+	}
+
+	// Composite index for polymorphic relationship queries (entity_type + entity_id)
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_images_entity
+		ON images(entity_type, entity_id)
+		WHERE deleted_at IS NULL
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create composite index on images(entity_type, entity_id): %w", err)
+	}
+
+	// Index on is_main for faster main image queries
+	if err := db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_images_is_main
+		ON images(is_main)
+		WHERE deleted_at IS NULL AND is_main = true
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create index on images.is_main: %w", err)
+	}
+
+	log.Println("Image table indexes applied successfully")
+	return nil
+}
