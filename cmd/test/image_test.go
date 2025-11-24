@@ -94,6 +94,78 @@ func TestImage_Upload(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
+	t.Run("Fail_InvalidFileType", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		project := CreateTestProject(testDB.DB, category.ID, userID)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		_ = writer.WriteField("entity_type", "project")
+		_ = writer.WriteField("entity_id", fmt.Sprintf("%d", project.ID))
+		_ = writer.WriteField("type", "image")
+
+		// Create a fake text file instead of an image
+		part, _ := writer.CreateFormFile("file", "test.txt")
+		_, _ = part.Write([]byte("This is not an image"))
+
+		writer.Close()
+
+		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp := ExecuteRequest(req)
+		assert.Equal(t, 400, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Fail_UnauthorizedEntity", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create a project owned by a different user
+		otherUserID := "other-user-id"
+		portfolio := CreateTestPortfolio(testDB.DB, otherUserID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, otherUserID)
+		project := CreateTestProject(testDB.DB, category.ID, otherUserID)
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+
+		_ = writer.WriteField("entity_type", "project")
+		_ = writer.WriteField("entity_id", fmt.Sprintf("%d", project.ID))
+		_ = writer.WriteField("type", "image")
+
+		testImageData := []byte{
+			0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
+			0x00, 0x00, 0x00, 0x0D, 0x49, 0x48, 0x44, 0x52,
+			0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01,
+			0x08, 0x06, 0x00, 0x00, 0x00, 0x1F, 0x15, 0xC4,
+			0x89, 0x00, 0x00, 0x00, 0x0A, 0x49, 0x44, 0x41,
+			0x54, 0x78, 0x9C, 0x63, 0x00, 0x01, 0x00, 0x00,
+			0x05, 0x00, 0x01, 0x0D, 0x0A, 0x2D, 0xB4, 0x00,
+			0x00, 0x00, 0x00, 0x49, 0x45, 0x4E, 0x44, 0xAE,
+		}
+
+		part, _ := writer.CreateFormFile("file", "test.png")
+		_, _ = part.Write(testImageData)
+
+		writer.Close()
+
+		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Authorization", "Bearer "+token)
+
+		resp := ExecuteRequest(req)
+		assert.Equal(t, 403, resp.Code) // Forbidden - entity not owned by user
+
+		cleanDatabase(testDB.DB)
+	})
+
 	t.Run("Unauthorized_NoToken", func(t *testing.T) {
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
@@ -176,6 +248,24 @@ func TestImage_Delete(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
+	t.Run("Fail_UnauthorizedDelete", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create an image owned by another user
+		otherUserID := "other-user-id"
+		portfolio := CreateTestPortfolio(testDB.DB, otherUserID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, otherUserID)
+		project := CreateTestProject(testDB.DB, category.ID, otherUserID)
+		image := CreateTestImage(testDB.DB, project.ID, "project", otherUserID)
+
+		url := fmt.Sprintf("/api/images/%d", image.ID)
+		resp := MakeRequest(t, "DELETE", url, nil, token)
+
+		assert.Equal(t, 403, resp.Code) // Forbidden
+
+		cleanDatabase(testDB.DB)
+	})
+
 	t.Run("Unauthorized_NoToken", func(t *testing.T) {
 		resp := MakeRequest(t, "DELETE", "/api/images/1", nil, "")
 		assert.Equal(t, 401, resp.Code)
@@ -231,6 +321,28 @@ func TestImage_Update(t *testing.T) {
 			data := body["data"].(map[string]interface{})
 			assert.Equal(t, true, data["is_main"])
 		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Fail_UnauthorizedUpdate", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create an image owned by another user
+		otherUserID := "other-user-id"
+		portfolio := CreateTestPortfolio(testDB.DB, otherUserID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, otherUserID)
+		project := CreateTestProject(testDB.DB, category.ID, otherUserID)
+		image := CreateTestImage(testDB.DB, project.ID, "project", otherUserID)
+
+		payload := map[string]interface{}{
+			"alt": "Trying to update someone else's image",
+		}
+
+		url := fmt.Sprintf("/api/images/%d", image.ID)
+		resp := MakeRequest(t, "PUT", url, payload, token)
+
+		assert.Equal(t, 403, resp.Code) // Forbidden
 
 		cleanDatabase(testDB.DB)
 	})

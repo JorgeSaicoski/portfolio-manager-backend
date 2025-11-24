@@ -63,3 +63,31 @@ func (r *imageRepository) CheckOwnership(id uint, ownerID string) (bool, error) 
 	}
 	return count > 0, nil
 }
+
+// CheckEntityOwnership verifies if a user owns the entity (project, portfolio, section)
+func (r *imageRepository) CheckEntityOwnership(entityID uint, entityType string, ownerID string) (bool, error) {
+	var count int64
+	var err error
+
+	switch entityType {
+	case "project":
+		err = r.db.Model(&models.Project{}).
+			Where("id = ? AND owner_id = ?", entityID, ownerID).
+			Count(&count).Error
+	case "portfolio":
+		err = r.db.Model(&models.Portfolio{}).
+			Where("id = ? AND owner_id = ?", entityID, ownerID).
+			Count(&count).Error
+	case "section":
+		err = r.db.Model(&models.Section{}).
+			Where("id = ? AND owner_id = ?", entityID, ownerID).
+			Count(&count).Error
+	default:
+		return false, nil
+	}
+
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}

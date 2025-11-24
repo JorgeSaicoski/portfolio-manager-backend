@@ -15,6 +15,7 @@ type Router struct {
 	sectionHandler        *handler2.SectionHandler
 	sectionContentHandler *handler2.SectionContentHandler
 	imageHandler          *handler2.ImageHandler
+	imageRepo             repo2.ImageRepository
 	metrics               *metrics.Collector
 }
 
@@ -45,6 +46,7 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 		sectionHandler:        sectionHandler,
 		sectionContentHandler: sectionContentHandler,
 		imageHandler:          imageHandler,
+		imageRepo:             imageRepo,
 		metrics:               metrics,
 	}
 }

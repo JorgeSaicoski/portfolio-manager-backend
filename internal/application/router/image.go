@@ -12,11 +12,23 @@ func (r *Router) RegisterImageRoutes(apiGroup *gin.RouterGroup) {
 	protected := images.Group("")
 	protected.Use(middleware.AuthMiddleware())
 	{
-		protected.POST("/upload", r.imageHandler.UploadImage)
-		protected.GET("", r.imageHandler.GetImages) // Query params: entity_type, entity_id
+		// Upload image with validation
+		protected.POST("/upload",
+			middleware.ValidateImageUpload(),
+			middleware.ValidateEntityOwnership(r.imageRepo),
+			r.imageHandler.UploadImage)
+
+		// Get images - no additional validation needed
+		protected.GET("", r.imageHandler.GetImages)
 		protected.GET("/:id", r.imageHandler.GetImageByID)
-		protected.PUT("/:id", r.imageHandler.UpdateImage)
-		protected.DELETE("/:id", r.imageHandler.DeleteImage)
+
+		// Update and delete require ownership validation
+		protected.PUT("/:id",
+			middleware.ValidateImageOwnership(r.imageRepo),
+			r.imageHandler.UpdateImage)
+		protected.DELETE("/:id",
+			middleware.ValidateImageOwnership(r.imageRepo),
+			r.imageHandler.DeleteImage)
 	}
 }
 

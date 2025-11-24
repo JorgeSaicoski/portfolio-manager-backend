@@ -76,4 +76,5 @@ type ImageRepository interface {
 	Update(image *models2.Image) error
 	Delete(id uint) error
 	CheckOwnership(id uint, ownerID string) (bool, error)
+	CheckEntityOwnership(entityID uint, entityType string, ownerID string) (bool, error)
 }
