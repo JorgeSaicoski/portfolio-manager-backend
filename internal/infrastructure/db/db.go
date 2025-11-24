@@ -135,6 +135,11 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("failed to apply image indexes: %w", err)
 	}
 
+	// Migrate existing project images to new Image model
+	if err := MigrateProjectImages(d.DB); err != nil {
+		return fmt.Errorf("failed to migrate project images: %w", err)
+	}
+
 	return nil
 }
 

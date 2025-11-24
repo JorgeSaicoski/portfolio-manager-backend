@@ -3,6 +3,7 @@ package db
 import (
 	"fmt"
 	"log"
+	"strings"
 
 	"gorm.io/gorm"
 )
@@ -348,4 +349,177 @@ func ApplyImageIndexes(db *gorm.DB) error {
 
 	log.Println("Image table indexes applied successfully")
 	return nil
+}
+
+// MigrateProjectImages migrates existing project image URLs to the new Image model
+// This handles backward compatibility for projects with old-style images and main_image fields
+func MigrateProjectImages(db *gorm.DB) error {
+	log.Println("Starting project image data migration...")
+
+	// Check if the old columns still exist
+	var hasImagesColumn, hasMainImageColumn bool
+
+	err := db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'projects' AND column_name = 'images'
+		)
+	`).Scan(&hasImagesColumn).Error
+	if err != nil {
+		return fmt.Errorf("failed to check for images column: %w", err)
+	}
+
+	err = db.Raw(`
+		SELECT EXISTS (
+			SELECT 1 FROM information_schema.columns
+			WHERE table_name = 'projects' AND column_name = 'main_image'
+		)
+	`).Scan(&hasMainImageColumn).Error
+	if err != nil {
+		return fmt.Errorf("failed to check for main_image column: %w", err)
+	}
+
+	if !hasImagesColumn && !hasMainImageColumn {
+		log.Println("Old image columns not found, migration already completed or not needed")
+		return nil
+	}
+
+	// Query to get all projects with their old image data
+	type OldProjectData struct {
+		ID        uint
+		Images    []string // Will be populated from text[] column
+		MainImage string
+		OwnerID   string
+	}
+
+	var projects []OldProjectData
+
+	// Build query based on which columns exist
+	query := "SELECT id, owner_id"
+	if hasImagesColumn {
+		query += ", images"
+	}
+	if hasMainImageColumn {
+		query += ", main_image"
+	}
+	query += " FROM projects WHERE deleted_at IS NULL"
+
+	if err := db.Raw(query).Scan(&projects).Error; err != nil {
+		log.Printf("Warning: failed to query projects for migration: %v", err)
+		// Don't fail - might be running on fresh database
+		return nil
+	}
+
+	migratedCount := 0
+	errorCount := 0
+
+	for _, project := range projects {
+		// Skip if no images to migrate
+		if len(project.Images) == 0 && project.MainImage == "" {
+			continue
+		}
+
+		// Migrate main_image first (if exists)
+		if project.MainImage != "" {
+			image := map[string]interface{}{
+				"url":           project.MainImage,
+				"thumbnail_url": project.MainImage, // Use same URL for old images
+				"file_name":     extractFilename(project.MainImage),
+				"file_size":     0, // Unknown for old data
+				"mime_type":     guessMimeType(project.MainImage),
+				"alt":           "",
+				"owner_id":      project.OwnerID,
+				"type":          "image",
+				"entity_id":     project.ID,
+				"entity_type":   "project",
+				"is_main":       true,
+			}
+
+			if err := db.Table("images").Create(image).Error; err != nil {
+				log.Printf("Warning: failed to migrate main_image for project %d: %v", project.ID, err)
+				errorCount++
+			} else {
+				migratedCount++
+			}
+		}
+
+		// Migrate images array
+		for _, imageURL := range project.Images {
+			if imageURL == "" || imageURL == project.MainImage {
+				continue // Skip empty or duplicate of main image
+			}
+
+			image := map[string]interface{}{
+				"url":           imageURL,
+				"thumbnail_url": imageURL, // Use same URL for old images
+				"file_name":     extractFilename(imageURL),
+				"file_size":     0, // Unknown for old data
+				"mime_type":     guessMimeType(imageURL),
+				"alt":           "",
+				"owner_id":      project.OwnerID,
+				"type":          "image",
+				"entity_id":     project.ID,
+				"entity_type":   "project",
+				"is_main":       false,
+			}
+
+			if err := db.Table("images").Create(image).Error; err != nil {
+				log.Printf("Warning: failed to migrate image for project %d: %v", project.ID, err)
+				errorCount++
+			} else {
+				migratedCount++
+			}
+		}
+	}
+
+	log.Printf("Project image migration completed: %d images migrated, %d errors", migratedCount, errorCount)
+
+	// Drop old columns if migration was successful and no errors
+	if errorCount == 0 {
+		if hasImagesColumn {
+			log.Println("Dropping old 'images' column from projects table...")
+			if err := db.Exec("ALTER TABLE projects DROP COLUMN IF EXISTS images").Error; err != nil {
+				log.Printf("Warning: failed to drop images column: %v", err)
+			} else {
+				log.Println("Old 'images' column dropped successfully")
+			}
+		}
+
+		if hasMainImageColumn {
+			log.Println("Dropping old 'main_image' column from projects table...")
+			if err := db.Exec("ALTER TABLE projects DROP COLUMN IF EXISTS main_image").Error; err != nil {
+				log.Printf("Warning: failed to drop main_image column: %v", err)
+			} else {
+				log.Println("Old 'main_image' column dropped successfully")
+			}
+		}
+	} else {
+		log.Printf("Skipping column drop due to %d migration errors", errorCount)
+	}
+
+	return nil
+}
+
+// extractFilename extracts filename from URL
+func extractFilename(url string) string {
+	parts := strings.Split(url, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return "unknown"
+}
+
+// guessMimeType guesses MIME type from file extension
+func guessMimeType(url string) string {
+	lowerURL := strings.ToLower(url)
+	if strings.HasSuffix(lowerURL, ".png") {
+		return "image/png"
+	} else if strings.HasSuffix(lowerURL, ".jpg") || strings.HasSuffix(lowerURL, ".jpeg") {
+		return "image/jpeg"
+	} else if strings.HasSuffix(lowerURL, ".webp") {
+		return "image/webp"
+	} else if strings.HasSuffix(lowerURL, ".gif") {
+		return "image/gif"
+	}
+	return "image/jpeg" // Default
 }

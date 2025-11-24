@@ -22,7 +22,8 @@ func (r *projectRepository) Create(project *models.Project) error {
 // GetByID For basic project info
 func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 	var project models.Project
-	err := r.db.Where("id = ?", id).
+	err := r.db.Preload("Images").
+		Where("id = ?", id).
 		First(&project).Error
 	return &project, err
 }
@@ -30,7 +31,8 @@ func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 // GetByOwnerIDBasic For list views - only basic project info for a specific owner
 func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Project, error) {
 	var projects []*models.Project
-	err := r.db.Where("owner_id = ?", ownerID).
+	err := r.db.Preload("Images").
+		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&projects).Error
@@ -40,7 +42,8 @@ func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int)
 // GetByCategoryID For list views - projects in a category
 func (r *projectRepository) GetByCategoryID(categoryID string) ([]*models.Project, error) {
 	var projects []*models.Project
-	err := r.db.Where("category_id = ?", categoryID).
+	err := r.db.Preload("Images").
+		Where("category_id = ?", categoryID).
 		Order("position ASC, created_at ASC").
 		Find(&projects).Error
 	return projects, err
@@ -61,7 +64,8 @@ func (r *projectRepository) Delete(id uint) error {
 
 func (r *projectRepository) List(limit, offset int) ([]*models.Project, error) {
 	var projects []*models.Project
-	err := r.db.Limit(limit).Offset(offset).
+	err := r.db.Preload("Images").
+		Limit(limit).Offset(offset).
 		Find(&projects).Error
 	return projects, err
 }
@@ -69,7 +73,8 @@ func (r *projectRepository) List(limit, offset int) ([]*models.Project, error) {
 // GetBySkills Find projects by skills
 func (r *projectRepository) GetBySkills(skills []string) ([]*models.Project, error) {
 	var projects []*models.Project
-	err := r.db.Where("skills && ?", skills).
+	err := r.db.Preload("Images").
+		Where("skills && ?", skills).
 		Find(&projects).Error
 	return projects, err
 }
@@ -77,7 +82,8 @@ func (r *projectRepository) GetBySkills(skills []string) ([]*models.Project, err
 // GetByClient Find projects by client name
 func (r *projectRepository) GetByClient(client string) ([]*models.Project, error) {
 	var projects []*models.Project
-	err := r.db.Where("client = ?", client).
+	err := r.db.Preload("Images").
+		Where("client = ?", client).
 		Find(&projects).Error
 	return projects, err
 }
