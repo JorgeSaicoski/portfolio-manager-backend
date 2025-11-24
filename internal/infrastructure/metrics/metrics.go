@@ -15,6 +15,8 @@ type Collector struct {
 	PortfoliosTotal     prometheus.Gauge
 	AuthAttempts        *prometheus.CounterVec
 	JwtTokensGenerated  *prometheus.CounterVec
+	ImagesUploaded      prometheus.Counter
+	ImagesDeleted       prometheus.Counter
 }
 
 func NewCollector() *Collector {
@@ -66,6 +68,20 @@ func NewCollector() *Collector {
 			},
 			[]string{"type"}, // access, refresh
 		),
+
+		ImagesUploaded: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "images_uploaded_total",
+				Help: "Total number of images uploaded",
+			},
+		),
+
+		ImagesDeleted: prometheus.NewCounter(
+			prometheus.CounterOpts{
+				Name: "images_deleted_total",
+				Help: "Total number of images deleted",
+			},
+		),
 	}
 
 	collector.registerMetrics()
@@ -80,6 +96,8 @@ func (c *Collector) registerMetrics() {
 		c.PortfoliosTotal,
 		c.AuthAttempts,
 		c.JwtTokensGenerated,
+		c.ImagesUploaded,
+		c.ImagesDeleted,
 	)
 }
 
@@ -117,6 +135,15 @@ func (c *Collector) IncrementAuthAttempts(authType, status string) {
 
 func (c *Collector) IncrementJwtTokens(tokenType string) {
 	c.JwtTokensGenerated.WithLabelValues(tokenType).Inc()
+}
+
+// Image Metrics
+func (c *Collector) IncImagesUploaded() {
+	c.ImagesUploaded.Inc()
+}
+
+func (c *Collector) IncImagesDeleted() {
+	c.ImagesDeleted.Inc()
 }
 
 // Background metrics collection
