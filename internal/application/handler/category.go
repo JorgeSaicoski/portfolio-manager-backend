@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/response"
@@ -183,10 +184,12 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
-		"userID":     userID,
-		"categoryID": newCategory.ID,
-		"title":      newCategory.Title,
+	audit.GetCreateLogger().WithFields(logrus.Fields{
+		"operation":   "CREATE_CATEGORY",
+		"userID":      userID,
+		"categoryID":  newCategory.ID,
+		"title":       newCategory.Title,
+		"portfolioID": newCategory.PortfolioID,
 	}).Info("Category created successfully")
 
 	response.Created(c, "category", &newCategory, "Category created successfully")
@@ -227,11 +230,13 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation":   "DELETE_CATEGORY",
 		"categoryID":  id,
 		"userID":      userID,
 		"portfolioID": category.PortfolioID,
 		"title":       category.Title,
+		"cascade":     "projects",
 	}).Info("Category deleted successfully (CASCADE: all related projects)")
 
 	response.OK(c, "message", "Category deleted successfully", "Success")

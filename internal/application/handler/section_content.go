@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/metrics"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/shared/dto/request"
@@ -289,7 +290,8 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	logrus.WithFields(logrus.Fields{
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation": "DELETE_SECTION_CONTENT",
 		"contentID": id,
 		"userID":    userID,
 		"sectionID": existing.SectionID,

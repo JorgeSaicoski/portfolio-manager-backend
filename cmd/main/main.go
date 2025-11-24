@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/sirupsen/logrus"
@@ -13,6 +14,9 @@ import (
 
 func main() {
 	logger := setupLogger()
+
+	// Initialize audit loggers for CRUD operations
+	audit.Initialize()
 
 	database := db.NewDatabase()
 	err := database.Initialize()
@@ -55,7 +59,7 @@ func setupLogger() *logrus.Logger {
 	if err := os.MkdirAll(auditDir, 0755); err != nil {
 		logger.WithError(err).Error("Failed to create audit directory")
 	} else {
-		// Setup file logging with rotation
+		// Setup main audit log with rotation (errors and important events only)
 		logFile := &lumberjack.Logger{
 			Filename:   filepath.Join(auditDir, "audit.log"),
 			MaxSize:    10, // megabytes
