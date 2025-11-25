@@ -8,19 +8,24 @@ import (
 func (r *Router) RegisterImageRoutes(apiGroup *gin.RouterGroup) {
 	images := apiGroup.Group("/images")
 
+	// Public routes
+	{
+		// Get images by entity (public)
+		images.GET("/entity/:type/:id", r.imageHandler.GetImagesByEntity)
+	}
+
 	// Protected routes - require authentication
-	protected := images.Group("")
+	protected := images.Group("/own")
 	protected.Use(middleware.AuthMiddleware())
 	{
 		// Upload image with validation
-		protected.POST("/upload",
+		protected.POST("",
 			middleware.ValidateImageUpload(),
 			middleware.ValidateEntityOwnership(r.imageRepo),
 			r.imageHandler.UploadImage)
 
-		// Get images - no additional validation needed
+		// Get user's own images
 		protected.GET("", r.imageHandler.GetImages)
-		protected.GET("/:id", r.imageHandler.GetImageByID)
 
 		// Update and delete require ownership validation
 		protected.PUT("/:id",

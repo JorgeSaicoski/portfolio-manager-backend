@@ -111,7 +111,7 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	response.Created(c, "image", dtoResponse.ToImageResponse(image), "Image uploaded successfully")
 }
 
-// GetImages retrieves images for a specific entity
+// GetImages retrieves images for a specific entity (query params)
 func (h *ImageHandler) GetImages(c *gin.Context) {
 	entityType := c.Query("entity_type")
 	entityIDStr := c.Query("entity_id")
@@ -119,6 +119,32 @@ func (h *ImageHandler) GetImages(c *gin.Context) {
 	// Validate query parameters
 	if entityType == "" || entityIDStr == "" {
 		response.BadRequest(c, "entity_type and entity_id are required")
+		return
+	}
+
+	entityID, err := strconv.Atoi(entityIDStr)
+	if err != nil {
+		response.BadRequest(c, "Invalid entity_id")
+		return
+	}
+
+	images, err := h.repo.GetByEntity(entityType, uint(entityID))
+	if err != nil {
+		response.InternalError(c, "Failed to retrieve images")
+		return
+	}
+
+	response.OK(c, "images", dtoResponse.ToImageResponses(images), "Success")
+}
+
+// GetImagesByEntity retrieves images for a specific entity (path params - public)
+func (h *ImageHandler) GetImagesByEntity(c *gin.Context) {
+	entityType := c.Param("type")
+	entityIDStr := c.Param("id")
+
+	// Validate path parameters
+	if entityType == "" {
+		response.BadRequest(c, "entity_type is required")
 		return
 	}
 
