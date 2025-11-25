@@ -72,6 +72,7 @@ func (s *Server) setupMiddleware() {
 	// Security middleware (applied first)
 	s.engine.Use(middleware2.RequestID())        // Add request ID for tracing
 	s.engine.Use(middleware2.PanicRecovery())    // Enhanced panic recovery
+	s.engine.Use(middleware2.ErrorLogging())     // Error logging (4xx/5xx)
 	s.engine.Use(middleware2.SecurityHeaders())  // Security headers
 	s.engine.Use(middleware2.RequestSizeLimit()) // Request size limits
 	s.engine.Use(middleware2.RateLimit())        // Rate limiting

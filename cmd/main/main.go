@@ -7,6 +7,7 @@ import (
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/errorlog"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -17,6 +18,9 @@ func main() {
 
 	// Initialize audit loggers for CRUD operations
 	audit.Initialize()
+
+	// Initialize error loggers for 4xx and 5xx errors
+	errorlog.Initialize()
 
 	database := db.NewDatabase()
 	err := database.Initialize()
