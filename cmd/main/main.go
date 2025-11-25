@@ -58,7 +58,23 @@ func setupLogger() *logrus.Logger {
 	auditDir := filepath.Join(".", "audit")
 	if err := os.MkdirAll(auditDir, 0755); err != nil {
 		logger.WithError(err).Error("Failed to create audit directory")
-	} else {
+	}
+
+	// Create upload directories if they don't exist
+	uploadDirs := []string{
+		filepath.Join(".", "uploads", "images", "original"),
+		filepath.Join(".", "uploads", "images", "thumbnail"),
+	}
+	for _, dir := range uploadDirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			logger.WithError(err).Errorf("Failed to create upload directory: %s", dir)
+		} else {
+			logger.Infof("Upload directory ready: %s", dir)
+		}
+	}
+
+	// Setup audit log rotation
+	{
 		// Setup main audit log with rotation (errors and important events only)
 		logFile := &lumberjack.Logger{
 			Filename:   filepath.Join(auditDir, "audit.log"),

@@ -55,7 +55,7 @@ func TestImage_Upload(t *testing.T) {
 		}
 
 		// Make request
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -89,7 +89,7 @@ func TestImage_Upload(t *testing.T) {
 			return
 		}
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -119,7 +119,7 @@ func TestImage_Upload(t *testing.T) {
 
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -162,7 +162,7 @@ func TestImage_Upload(t *testing.T) {
 
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -177,7 +177,7 @@ func TestImage_Upload(t *testing.T) {
 		writer := multipart.NewWriter(body)
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 
 		resp := ExecuteRequest(req)
