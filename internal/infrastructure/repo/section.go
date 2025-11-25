@@ -20,8 +20,8 @@ func (r *sectionRepository) Create(section *models.Section) error {
 }
 
 // GetByOwnerID For list views - only basic section info for a specific owner
-func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]*models.Section, error) {
-	var sections []*models.Section
+func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, error) {
+	var sections []models.Section
 	err := r.db.Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
@@ -49,8 +49,8 @@ func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, erro
 }
 
 // GetByPortfolioID For list views - only basic portfolio info
-func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]*models.Section, error) {
-	var sections []*models.Section
+func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]models.Section, error) {
+	var sections []models.Section
 	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
@@ -59,8 +59,8 @@ func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]*models.Sect
 }
 
 // GetByPortfolioIDWithRelations For detail views - with contents preloaded
-func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Section, error) {
-	var sections []*models.Section
+func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]models.Section, error) {
+	var sections []models.Section
 	err := r.db.Preload("Contents", func(db *gorm.DB) *gorm.DB {
 		return db.Order("section_contents.order ASC, section_contents.created_at ASC")
 	}).
@@ -70,8 +70,8 @@ func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([
 	return sections, err
 }
 
-func (r *sectionRepository) GetByType(sectionType string) ([]*models.Section, error) {
-	var sections []*models.Section
+func (r *sectionRepository) GetByType(sectionType string) ([]models.Section, error) {
+	var sections []models.Section
 	err := r.db.Where("type = ?", sectionType).
 		Find(&sections).Error
 	return sections, err
@@ -90,8 +90,8 @@ func (r *sectionRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Section{}, id).Error
 }
 
-func (r *sectionRepository) List(limit, offset int) ([]*models.Section, error) {
-	var sections []*models.Section
+func (r *sectionRepository) List(limit, offset int) ([]models.Section, error) {
+	var sections []models.Section
 	err := r.db.Limit(limit).Offset(offset).
 		Find(&sections).Error
 	return sections, err

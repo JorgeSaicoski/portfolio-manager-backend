@@ -47,10 +47,10 @@ func ToProjectResponse(project *models.Project) ProjectResponse {
 }
 
 // ToProjectListResponse converts a slice of models to response DTOs
-func ToProjectListResponse(projects []*models.Project) []ProjectResponse {
+func ToProjectListResponse(projects []models.Project) []ProjectResponse {
 	responses := make([]ProjectResponse, len(projects))
 	for i, project := range projects {
-		responses[i] = ToProjectResponse(project)
+		responses[i] = ToProjectResponse(&project)
 	}
 	return responses
 }

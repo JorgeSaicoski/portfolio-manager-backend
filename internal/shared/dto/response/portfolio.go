@@ -69,10 +69,10 @@ func ToPortfolioDetailResponse(portfolio *models.Portfolio) PortfolioDetailRespo
 }
 
 // ToPortfolioListResponse converts a slice of models to response DTOs
-func ToPortfolioListResponse(portfolios []*models.Portfolio) []PortfolioResponse {
+func ToPortfolioListResponse(portfolios []models.Portfolio) []PortfolioResponse {
 	responses := make([]PortfolioResponse, len(portfolios))
 	for i, portfolio := range portfolios {
-		responses[i] = ToPortfolioResponse(portfolio)
+		responses[i] = ToPortfolioResponse(&portfolio)
 	}
 	return responses
 }

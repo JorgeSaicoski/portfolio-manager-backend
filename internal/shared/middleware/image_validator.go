@@ -1,25 +1,22 @@
 package middleware
 
 import (
+	"image"
+	_ "image/jpeg"
+	_ "image/png"
 	"net/http"
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/gin-gonic/gin"
+	_ "golang.org/x/image/webp"
 )
 
 const (
 	MaxImageFileSize = 10 * 1024 * 1024 // 10MB
 )
 
-var allowedImageTypes = map[string]bool{
-	"image/jpeg": true,
-	"image/jpg":  true,
-	"image/png":  true,
-	"image/webp": true,
-}
-
-// ValidateImageUpload validates file size and MIME type for image uploads
+// ValidateImageUpload validates file size and image format for image uploads
 func ValidateImageUpload() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the uploaded file
@@ -39,13 +36,35 @@ func ValidateImageUpload() gin.HandlerFunc {
 			return
 		}
 
-		// Validate MIME type
-		contentType := file.Header.Get("Content-Type")
-		if !allowedImageTypes[contentType] {
+		// Validate image format by actually decoding the file
+		src, err := file.Open()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Failed to read uploaded file"})
+			c.Abort()
+			return
+		}
+		defer src.Close()
+
+		// Try to decode the image to ensure it's valid and detect format
+		_, format, err := image.DecodeConfig(src)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid image file"})
+			c.Abort()
+			return
+		}
+
+		// Validate format is allowed (jpeg, png, webp)
+		allowedFormats := map[string]bool{
+			"jpeg": true,
+			"png":  true,
+			"webp": true,
+		}
+
+		if !allowedFormats[format] {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"error":         "Invalid file type. Only JPEG, PNG, and WebP images are allowed",
-				"received_type": contentType,
-				"allowed_types": []string{"image/jpeg", "image/png", "image/webp"},
+				"received_type": format,
+				"allowed_types": []string{"jpeg", "png", "webp"},
 			})
 			c.Abort()
 			return

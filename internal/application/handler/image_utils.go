@@ -40,20 +40,25 @@ func ValidateImage(file multipart.File, header *multipart.FileHeader) error {
 		return fmt.Errorf("file size exceeds maximum allowed size of %d bytes", MaxFileSize)
 	}
 
-	// Check mime type
-	mimeType := header.Header.Get("Content-Type")
-	if !AllowedMimeTypes[mimeType] {
-		return fmt.Errorf("invalid file type: %s. Allowed types: jpeg, png, webp", mimeType)
-	}
-
-	// Try to decode the image to ensure it's valid
-	_, _, err := image.DecodeConfig(file)
+	// Try to decode the image to ensure it's valid and detect format
+	_, format, err := image.DecodeConfig(file)
 	if err != nil {
 		return fmt.Errorf("invalid image file: %v", err)
 	}
 
 	// Reset file pointer to beginning
 	file.Seek(0, 0)
+
+	// Validate format is allowed (jpeg, png, webp)
+	allowedFormats := map[string]bool{
+		"jpeg": true,
+		"png":  true,
+		"webp": true,
+	}
+
+	if !allowedFormats[format] {
+		return fmt.Errorf("invalid file type: %s. Allowed types: jpeg, png, webp", format)
+	}
 
 	return nil
 }

@@ -66,10 +66,10 @@ func ToCategoryDetailResponse(category *models.Category) CategoryDetailResponse 
 }
 
 // ToCategoryListResponse converts a slice of models to response DTOs
-func ToCategoryListResponse(categories []*models.Category) []CategoryResponse {
+func ToCategoryListResponse(categories []models.Category) []CategoryResponse {
 	responses := make([]CategoryResponse, len(categories))
 	for i, category := range categories {
-		responses[i] = ToCategoryResponse(category)
+		responses[i] = ToCategoryResponse(&category)
 	}
 	return responses
 }
