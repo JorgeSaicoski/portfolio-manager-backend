@@ -63,8 +63,6 @@ func TestProject_Create(t *testing.T) {
 		payload := map[string]interface{}{
 			"title":       "E-commerce Platform",
 			"description": "A full-stack e-commerce platform",
-			"images":      []string{"https://example.com/img1.png", "https://example.com/img2.png"},
-			"main_image":  "https://example.com/main.png",
 			"skills":      []string{"React", "Node.js", "PostgreSQL"},
 			"client":      "Tech Corp",
 			"link":        "https://example.com",
@@ -171,16 +169,47 @@ func TestProject_Create(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
-	t.Run("Success_WithImagesArray", func(t *testing.T) {
+	t.Run("Success_WithImages", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		project := CreateTestProject(testDB.DB, category.ID, userID)
+
+		// Add images using the Image model
+		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 1")
+		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 2")
+		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 3")
+
+		// Get the project to verify images are loaded
+		resp := MakeRequest(t, "GET", fmt.Sprintf("/api/projects/own/%d", project.ID), nil, token)
+
+		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			images := data["images"].([]interface{})
+			assert.Equal(t, 3, len(images))
+
+			// Verify first image structure
+			firstImage := images[0].(map[string]interface{})
+			assert.Contains(t, firstImage, "url")
+			assert.Contains(t, firstImage, "alt")
+			assert.Contains(t, firstImage, "entity_type")
+			assert.Equal(t, "project", firstImage["entity_type"])
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_WithoutImages", func(t *testing.T) {
 		cleanDatabase(testDB.DB)
 
 		portfolio := CreateTestPortfolio(testDB.DB, userID)
 		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
 
 		payload := map[string]interface{}{
-			"title":       "Image Gallery Project",
-			"description": "Project with multiple images",
-			"images":      []string{"img1.png", "img2.png", "img3.png"},
+			"title":       "Project Without Images",
+			"description": "A project with no images",
 			"category_id": category.ID,
 		}
 
@@ -189,8 +218,15 @@ func TestProject_Create(t *testing.T) {
 		AssertJSONResponse(t, resp, 201, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			data := body["data"].(map[string]interface{})
-			images := data["images"].([]interface{})
-			assert.Equal(t, 3, len(images))
+			assert.Equal(t, "Project Without Images", data["title"])
+
+			// Images should be an empty array or nil
+			if images, ok := data["images"]; ok {
+				if images != nil {
+					imageArray := images.([]interface{})
+					assert.Equal(t, 0, len(imageArray))
+				}
+			}
 		})
 
 		cleanDatabase(testDB.DB)

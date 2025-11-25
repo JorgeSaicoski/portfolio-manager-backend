@@ -54,11 +54,9 @@ func CreateTestProject(db *gorm.DB, categoryID uint, ownerID string) *models2.Pr
 	project := &models2.Project{
 		Title:       "Test Project",
 		Description: "Test project description",
-		Images:      []string{},
 		Skills:      []string{"Go", "React"},
 		CategoryID:  categoryID,
 		OwnerID:     ownerID,
-		MainImage:   "https://example.com/image.png",
 		Client:      "Test Client",
 		Link:        "https://example.com",
 	}
@@ -70,11 +68,9 @@ func CreateTestProjectWithTitle(db *gorm.DB, categoryID uint, ownerID string, ti
 	project := &models2.Project{
 		Title:       title,
 		Description: "Test project description",
-		Images:      []string{},
 		Skills:      []string{"Go", "React"},
 		CategoryID:  categoryID,
 		OwnerID:     ownerID,
-		MainImage:   "https://example.com/image.png",
 		Client:      "Test Client",
 		Link:        "https://example.com",
 	}
@@ -105,6 +101,43 @@ func CreateTestSectionWithTitle(db *gorm.DB, portfolioID uint, ownerID string, t
 	}
 	db.Create(section)
 	return section
+}
+
+// Image fixtures
+func CreateTestImage(db *gorm.DB, entityID uint, entityType string, ownerID string) *models2.Image {
+	image := &models2.Image{
+		URL:          "/uploads/images/original/test.png",
+		ThumbnailURL: "/uploads/images/thumbnail/test.png",
+		FileName:     "test.png",
+		FileSize:     1024,
+		MimeType:     "image/png",
+		Alt:          "Test image",
+		OwnerID:      ownerID,
+		Type:         "image",
+		EntityID:     entityID,
+		EntityType:   entityType,
+		IsMain:       false,
+	}
+	db.Create(image)
+	return image
+}
+
+func CreateTestImageWithAlt(db *gorm.DB, entityID uint, entityType string, ownerID string, alt string) *models2.Image {
+	image := &models2.Image{
+		URL:          "/uploads/images/original/test.png",
+		ThumbnailURL: "/uploads/images/thumbnail/test.png",
+		FileName:     "test.png",
+		FileSize:     1024,
+		MimeType:     "image/png",
+		Alt:          alt,
+		OwnerID:      ownerID,
+		Type:         "image",
+		EntityID:     entityID,
+		EntityType:   entityType,
+		IsMain:       false,
+	}
+	db.Create(image)
+	return image
 }
 
 func stringPtr(s string) *string {

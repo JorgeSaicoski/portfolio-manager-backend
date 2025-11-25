@@ -34,8 +34,7 @@ func (a StringArray) Value() (driver.Value, error) {
 type Project struct {
 	gorm.Model
 	Title       string      `json:"title"`
-	Images      StringArray `json:"images" gorm:"type:text[]"`
-	MainImage   string      `json:"main_image"`
+	Images      []Image     `json:"images,omitempty" gorm:"polymorphic:Entity;polymorphicValue:project"`
 	Description string      `json:"description" gorm:"type:text"`
 	Skills      StringArray `json:"skills" gorm:"type:text[]"`
 	Client      string      `json:"client"`

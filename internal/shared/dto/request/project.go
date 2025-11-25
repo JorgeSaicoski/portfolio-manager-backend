@@ -1,10 +1,9 @@
 package request
 
 // CreateProjectRequest represents the request body for creating a project
+// Note: Images are now managed separately via the image endpoints
 type CreateProjectRequest struct {
 	Title       string   `json:"title" binding:"required,min=1,max=255"`
-	Images      []string `json:"images,omitempty"`
-	MainImage   string   `json:"main_image" binding:"omitempty,url"`
 	Description string   `json:"description" binding:"required,min=1"`
 	Skills      []string `json:"skills,omitempty"`
 	Client      string   `json:"client" binding:"omitempty,max=255"`
@@ -13,10 +12,9 @@ type CreateProjectRequest struct {
 }
 
 // UpdateProjectRequest represents the request body for updating a project
+// Note: Images are now managed separately via the image endpoints
 type UpdateProjectRequest struct {
 	Title       string   `json:"title" binding:"omitempty,min=1,max=255"`
-	Images      []string `json:"images,omitempty"`
-	MainImage   string   `json:"main_image" binding:"omitempty,url"`
 	Description string   `json:"description" binding:"omitempty,min=1"`
 	Skills      []string `json:"skills,omitempty"`
 	Client      string   `json:"client" binding:"omitempty,max=255"`

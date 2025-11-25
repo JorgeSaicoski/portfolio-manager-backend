@@ -101,6 +101,7 @@ func (d *Database) Migrate() error {
 		&models2.SectionContent{},
 		&models2.Category{},
 		&models2.Project{},
+		&models2.Image{},
 	)
 
 	if err != nil {
@@ -127,6 +128,16 @@ func (d *Database) Migrate() error {
 	// Add CASCADE DELETE constraints to foreign keys
 	if err := AddCascadeDeleteConstraints(d.DB); err != nil {
 		return fmt.Errorf("failed to add CASCADE DELETE constraints: %w", err)
+	}
+
+	// Apply image table indexes
+	if err := ApplyImageIndexes(d.DB); err != nil {
+		return fmt.Errorf("failed to apply image indexes: %w", err)
+	}
+
+	// Migrate existing project images to new Image model
+	if err := MigrateProjectImages(d.DB); err != nil {
+		return fmt.Errorf("failed to migrate project images: %w", err)
 	}
 
 	return nil

@@ -147,7 +147,7 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		idToken, err := oidcVerifier.Verify(ctx, accessToken)
 		if err != nil {
-			logger.WithError(err).WithField("token_prefix", accessToken[:min(20, len(accessToken))]).Warn("Token verification failed")
+			logger.WithError(err).WithField("token_prefix", accessToken[:smaller(20, len(accessToken))]).Warn("Token verification failed")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
@@ -192,8 +192,8 @@ func getTestUser() User {
 	}
 }
 
-// Helper function for min
-func min(a, b int) int {
+// Helper function for smaller
+func smaller(a, b int) int {
 	if a < b {
 		return a
 	}

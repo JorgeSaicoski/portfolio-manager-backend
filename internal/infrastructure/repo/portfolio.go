@@ -20,8 +20,8 @@ func (r *portfolioRepository) Create(portfolio *models.Portfolio) error {
 }
 
 // For list views - only basic portfolio info
-func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Portfolio, error) {
-	var portfolios []*models.Portfolio
+func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Portfolio, error) {
+	var portfolios []models.Portfolio
 	err := r.db.Select("id, title, description, owner_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
@@ -57,8 +57,8 @@ func (r *portfolioRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Portfolio{}, id).Error
 }
 
-func (r *portfolioRepository) List(limit, offset int) ([]*models.Portfolio, error) {
-	var portfolios []*models.Portfolio
+func (r *portfolioRepository) List(limit, offset int) ([]models.Portfolio, error) {
+	var portfolios []models.Portfolio
 	err := r.db.Preload("Sections").Preload("Categories").
 		Limit(limit).Offset(offset).
 		Find(&portfolios).Error

@@ -47,8 +47,8 @@ func (r *categoryRepository) GetByIDWithRelations(id uint) (*models.Category, er
 }
 
 // GetByPortfolioID For list views - only basic category info
-func (r *categoryRepository) GetByPortfolioID(portfolioID string) ([]*models.Category, error) {
-	var categories []*models.Category
+func (r *categoryRepository) GetByPortfolioID(portfolioID string) ([]models.Category, error) {
+	var categories []models.Category
 	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
@@ -57,8 +57,8 @@ func (r *categoryRepository) GetByPortfolioID(portfolioID string) ([]*models.Cat
 }
 
 // GetByPortfolioIDWithRelations For detail views - with projects preloaded
-func (r *categoryRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]*models.Category, error) {
-	var categories []*models.Category
+func (r *categoryRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]models.Category, error) {
+	var categories []models.Category
 	err := r.db.Preload("Projects", func(db *gorm.DB) *gorm.DB {
 		return db.Order("projects.position ASC, projects.created_at ASC")
 	}).
@@ -81,16 +81,16 @@ func (r *categoryRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Category{}, id).Error
 }
 
-func (r *categoryRepository) List(limit, offset int) ([]*models.Category, error) {
-	var categories []*models.Category
+func (r *categoryRepository) List(limit, offset int) ([]models.Category, error) {
+	var categories []models.Category
 	err := r.db.Limit(limit).Offset(offset).
 		Find(&categories).Error
 	return categories, err
 }
 
 // GetByOwnerIDBasic For list views - categories owned by user
-func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]*models.Category, error) {
-	var categories []*models.Category
+func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Category, error) {
+	var categories []models.Category
 	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
