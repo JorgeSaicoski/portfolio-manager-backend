@@ -71,8 +71,8 @@ type CategoryRepository interface {
 type ImageRepository interface {
 	Create(image *models2.Image) error
 	GetByID(id uint) (*models2.Image, error)
-	GetByEntity(entityType string, entityID uint) ([]*models2.Image, error)
-	GetByOwnerID(ownerID string, limit, offset int) ([]*models2.Image, error)
+	GetByEntity(entityType string, entityID uint) ([]models2.Image, error)
+	GetByOwnerID(ownerID string, limit, offset int) ([]models2.Image, error)
 	Update(image *models2.Image) error
 	Delete(id uint) error
 	CheckOwnership(id uint, ownerID string) (bool, error)

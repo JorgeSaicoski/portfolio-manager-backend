@@ -3,10 +3,8 @@ package test
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,7 +48,10 @@ func TestImage_Upload(t *testing.T) {
 		part, _ := writer.CreateFormFile("file", "test.png")
 		_, _ = part.Write(testImageData)
 
-		writer.Close()
+		err := writer.Close()
+		if err != nil {
+			return
+		}
 
 		// Make request
 		req, _ := http.NewRequest("POST", "/api/images/upload", body)
@@ -82,7 +83,10 @@ func TestImage_Upload(t *testing.T) {
 		_ = writer.WriteField("entity_type", "project")
 		_ = writer.WriteField("entity_id", fmt.Sprintf("%d", project.ID))
 		_ = writer.WriteField("type", "image")
-		writer.Close()
+		err := writer.Close()
+		if err != nil {
+			return
+		}
 
 		req, _ := http.NewRequest("POST", "/api/images/upload", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())

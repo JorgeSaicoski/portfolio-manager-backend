@@ -26,8 +26,8 @@ func (r *imageRepository) GetByID(id uint) (*models.Image, error) {
 }
 
 // GetByEntity retrieves all images for a specific entity (e.g., project, portfolio, section)
-func (r *imageRepository) GetByEntity(entityType string, entityID uint) ([]*models.Image, error) {
-	var images []*models.Image
+func (r *imageRepository) GetByEntity(entityType string, entityID uint) ([]models.Image, error) {
+	var images []models.Image
 	err := r.db.Where("entity_type = ? AND entity_id = ?", entityType, entityID).
 		Order("is_main DESC, created_at ASC").
 		Find(&images).Error
@@ -35,8 +35,8 @@ func (r *imageRepository) GetByEntity(entityType string, entityID uint) ([]*mode
 }
 
 // GetByOwnerID retrieves all images owned by a specific user
-func (r *imageRepository) GetByOwnerID(ownerID string, limit, offset int) ([]*models.Image, error) {
-	var images []*models.Image
+func (r *imageRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Image, error) {
+	var images []models.Image
 	err := r.db.Where("owner_id = ?", ownerID).
 		Order("created_at DESC").
 		Limit(limit).Offset(offset).

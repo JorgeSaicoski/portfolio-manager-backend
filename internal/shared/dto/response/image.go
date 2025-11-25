@@ -43,10 +43,10 @@ func ToImageResponse(image *models.Image) ImageResponse {
 }
 
 // ToImageResponses converts a slice of models.Image to ImageResponse slice
-func ToImageResponses(images []*models.Image) []ImageResponse {
+func ToImageResponses(images []models.Image) []ImageResponse {
 	responses := make([]ImageResponse, len(images))
 	for i, image := range images {
-		responses[i] = ToImageResponse(image)
+		responses[i] = ToImageResponse(&image) // pass pointer
 	}
 	return responses
 }
