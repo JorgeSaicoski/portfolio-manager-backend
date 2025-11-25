@@ -54,11 +54,9 @@ func CreateTestProject(db *gorm.DB, categoryID uint, ownerID string) *models2.Pr
 	project := &models2.Project{
 		Title:       "Test Project",
 		Description: "Test project description",
-		Images:      []string{},
 		Skills:      []string{"Go", "React"},
 		CategoryID:  categoryID,
 		OwnerID:     ownerID,
-		MainImage:   "https://example.com/image.png",
 		Client:      "Test Client",
 		Link:        "https://example.com",
 	}
@@ -70,11 +68,9 @@ func CreateTestProjectWithTitle(db *gorm.DB, categoryID uint, ownerID string, ti
 	project := &models2.Project{
 		Title:       title,
 		Description: "Test project description",
-		Images:      []string{},
 		Skills:      []string{"Go", "React"},
 		CategoryID:  categoryID,
 		OwnerID:     ownerID,
-		MainImage:   "https://example.com/image.png",
 		Client:      "Test Client",
 		Link:        "https://example.com",
 	}
