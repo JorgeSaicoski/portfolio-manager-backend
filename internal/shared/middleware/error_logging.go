@@ -221,14 +221,27 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 
 // getErrorMessage extracts error message from gin context or response
 func getErrorMessage(c *gin.Context) string {
-	// Priority 1: Check Gin's error context
+	// Priority 1: Check Gin's error context (includes all errors added via c.Error())
 	if len(c.Errors) > 0 {
-		return c.Errors.Last().Error()
+		// Return all errors concatenated for full context
+		errMessages := make([]string, 0, len(c.Errors))
+		for _, err := range c.Errors {
+			errMessages = append(errMessages, err.Error())
+		}
+		return strings.Join(errMessages, "; ")
 	}
 
-	// Priority 2: Check if there's an error in the response (for JSON responses)
-	// This requires checking what was written to the response body
-	// For now, we'll use a generic message based on status code
+	// Priority 2: Check if there's a stored error value in the context
+	if err, exists := c.Get("error"); exists {
+		if errStr, ok := err.(string); ok {
+			return errStr
+		}
+		if errObj, ok := err.(error); ok {
+			return errObj.Error()
+		}
+	}
+
+	// Priority 3: Generic message based on status code
 	status := c.Writer.Status()
 
 	// Common HTTP status messages

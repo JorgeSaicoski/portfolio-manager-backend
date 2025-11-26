@@ -1,7 +1,10 @@
 package repo
 
 import (
+	"fmt"
+
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -51,11 +54,30 @@ func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, erro
 
 // GetByPortfolioID For list views - only basic portfolio info
 func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]models.Section, error) {
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+	}).Debug("Repository: GetByPortfolioID called")
+
 	var sections []models.Section
 	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
 		Find(&sections).Error
+
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+			"errorType":   fmt.Sprintf("%T", err),
+		}).Error("Repository: Database query failed")
+		return nil, err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+		"resultCount": len(sections),
+	}).Debug("Repository: Query successful")
+
 	return sections, err
 }
 

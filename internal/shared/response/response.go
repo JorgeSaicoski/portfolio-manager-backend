@@ -64,7 +64,19 @@ func NotFound(c *gin.Context, message string) {
 
 // InternalError is a convenience wrapper for http.StatusInternalServerError error responses
 func InternalError(c *gin.Context, message string) {
+	// Store the error message in context for error logging middleware
+	c.Set("error", message)
 	Error(c, http.StatusInternalServerError, message)
+}
+
+// InternalErrorWithDetails logs detailed error information while showing user-friendly message
+func InternalErrorWithDetails(c *gin.Context, userMessage string, detailedError error) {
+	// Store detailed error for logging middleware
+	if detailedError != nil {
+		c.Error(detailedError) // Add to gin's error chain for middleware
+		c.Set("error", detailedError.Error())
+	}
+	Error(c, http.StatusInternalServerError, userMessage)
 }
 
 // Forbidden is a convenience wrapper for http.StatusForbidden error responses

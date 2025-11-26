@@ -38,7 +38,7 @@ func setupErrorLogger(filename string) *logrus.Logger {
 		},
 	})
 
-	logger.SetLevel(logrus.ErrorLevel)
+	logger.SetLevel(logrus.WarnLevel)
 
 	// Create errors directory
 	errorsDir := filepath.Join(".", "errors")

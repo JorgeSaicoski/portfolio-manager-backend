@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -57,9 +58,31 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
-	portfolioID := c.Param("id")
 
+	portfolioID := c.Param("portfolioId")
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+		"handler":     "GetByPortfolio",
+	}).Info("GetByPortfolio handler called")
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+	}).Debug("Calling repo.GetByPortfolioID")
 	sections, err := h.repo.GetByPortfolioID(portfolioID)
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+			"errorType":   fmt.Sprintf("%T", err),
+		}).Error("Failed to get sections from repository")
+		response.InternalErrorWithDetails(c, "Failed to retrieve sections", err)
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID":   portfolioID,
+		"sectionsCount": len(sections),
+	}).Debug("Successfully retrieved sections")
+
 	if err != nil {
 		response.InternalError(c, "Failed to retrieve sections")
 		return
