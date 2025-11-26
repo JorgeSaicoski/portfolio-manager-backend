@@ -221,7 +221,7 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 	}
 
 	// Get existing image
-	image, err := h.repo.GetByID(uint(imageID))
+	image, err = h.repo.GetByID(uint(imageID))
 	if err != nil {
 		response.NotFound(c, "Image not found")
 		return
