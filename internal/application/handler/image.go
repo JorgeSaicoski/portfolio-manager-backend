@@ -194,13 +194,22 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 	}
 
 	// Check ownership
-	isOwner, err := h.repo.CheckOwnership(uint(imageID), userID)
+	// Get image to check ownership and get details
+	image, err := h.repo.GetByID(uint(imageID))
 	if err != nil {
-		response.InternalError(c, "Failed to verify ownership")
+		response.NotFound(c, "Image not found")
 		return
 	}
-	if !isOwner {
-		response.Forbidden(c, "You don't have permission to update this image")
+
+	if image.OwnerID != userID {
+		response.ForbiddenWithDetails(c, "You don't have permission to update this image", map[string]interface{}{
+			"resource_type": "image",
+			"resource_id":   image.ID,
+			"owner_id":      image.OwnerID,
+			"entity_type":   image.EntityType,
+			"entity_id":     image.EntityID,
+			"action":        "update",
+		})
 		return
 	}
 
@@ -271,20 +280,22 @@ func (h *ImageHandler) DeleteImage(c *gin.Context) {
 	}
 
 	// Check ownership
-	isOwner, err := h.repo.CheckOwnership(uint(imageID), userID)
-	if err != nil {
-		response.InternalError(c, "Failed to verify ownership")
-		return
-	}
-	if !isOwner {
-		response.Forbidden(c, "You don't have permission to delete this image")
-		return
-	}
-
-	// Get image details for audit log and file cleanup
+	// Get image details for ownership check, audit log and file cleanup
 	image, err := h.repo.GetByID(uint(imageID))
 	if err != nil {
 		response.NotFound(c, "Image not found")
+		return
+	}
+
+	if image.OwnerID != userID {
+		response.ForbiddenWithDetails(c, "You don't have permission to delete this image", map[string]interface{}{
+			"resource_type": "image",
+			"resource_id":   image.ID,
+			"owner_id":      image.OwnerID,
+			"entity_type":   image.EntityType,
+			"entity_id":     image.EntityID,
+			"action":        "delete",
+		})
 		return
 	}
 

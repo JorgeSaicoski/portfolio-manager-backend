@@ -163,7 +163,12 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	}
 
 	if portfolio.OwnerID != userID {
-		response.Forbidden(c, "Access denied: portfolio belongs to another user")
+		response.ForbiddenWithDetails(c, "Access denied: portfolio belongs to another user", map[string]interface{}{
+			"resource_type": "portfolio",
+			"resource_id":   portfolio.ID,
+			"owner_id":      portfolio.OwnerID,
+			"action":        "create_section",
+		})
 		return
 	}
 
@@ -228,7 +233,12 @@ func (h *SectionHandler) Update(c *gin.Context) {
 		return
 	}
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update",
+		})
 		return
 	}
 
@@ -276,7 +286,12 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 	}
 
 	if section.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   section.ID,
+			"owner_id":      section.OwnerID,
+			"action":        "delete",
+		})
 		return
 	}
 
@@ -334,7 +349,12 @@ func (h *SectionHandler) UpdatePosition(c *gin.Context) {
 	}
 
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update_position",
+		})
 		return
 	}
 

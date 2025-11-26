@@ -21,6 +21,6 @@ func (r *Router) RegisterSectionRoutes(apiGroup *gin.RouterGroup) {
 
 	// Public routes - no auth required
 	sections.GET("/public/:id", r.sectionHandler.GetByID)
-	sections.GET("/portfolio/:portfolioId", r.sectionHandler.GetByPortfolio)
+	sections.GET("/portfolio/:id", r.sectionHandler.GetByPortfolio)
 	sections.GET("/type", r.sectionHandler.GetByType)
 }

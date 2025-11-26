@@ -194,6 +194,12 @@ func logServerError(c *gin.Context, status int, errorMsg, file string, line int,
 	dbErrorDetails := extractDatabaseError(c)
 	if dbErrorDetails != "" {
 		fields["database_error"] = dbErrorDetails
+		// If we have a database error, use it as the main error message for clarity
+		if errorMsg == "Internal Server Error" || errorMsg == "Failed to retrieve sections" ||
+			strings.Contains(errorMsg, "Failed to") {
+			fields["user_error"] = errorMsg
+			fields["error"] = dbErrorDetails // Replace generic message with actual DB error
+		}
 	}
 
 	logger.WithFields(fields).Error("Server error occurred")
@@ -244,6 +250,17 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 	// Add path params if present
 	if len(pathParams) > 0 {
 		fields["path_params"] = pathParams
+	}
+
+	// Add forbidden details if this is an unauthorized access attempt
+	if status == 403 {
+		if forbiddenDetails, exists := c.Get("forbidden_details"); exists {
+			if details, ok := forbiddenDetails.(map[string]interface{}); ok {
+				for key, value := range details {
+					fields[key] = value
+				}
+			}
+		}
 	}
 
 	logger.WithFields(fields).Warn("Client error occurred")
