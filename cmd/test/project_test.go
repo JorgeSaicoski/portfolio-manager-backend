@@ -682,3 +682,115 @@ func TestProject_DuplicateCheck(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 }
+
+// TestProject_Create_SetsPositionAutomatically tests that the database trigger
+// automatically assigns sequential positions to projects within the same category
+func TestProject_Create_SetsPositionAutomatically(t *testing.T) {
+	token := GetTestAuthToken()
+	userID := GetTestUserID()
+
+	t.Run("Success_AutoAssignSequentialPositions", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create test data
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+
+		// Create first project without specifying position
+		payload1 := map[string]interface{}{
+			"title":       "First Project",
+			"description": "First project in category",
+			"category_id": category.ID,
+		}
+		resp1 := MakeRequest(t, "POST", "/api/projects/own", payload1, token)
+
+		AssertJSONResponse(t, resp1, 201, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			assert.Equal(t, "First Project", data["title"])
+			// Position should be auto-assigned as 1
+			position := data["position"].(float64)
+			assert.Equal(t, float64(1), position, "First project should have position 1")
+		})
+
+		// Create second project without specifying position
+		payload2 := map[string]interface{}{
+			"title":       "Second Project",
+			"description": "Second project in category",
+			"category_id": category.ID,
+		}
+		resp2 := MakeRequest(t, "POST", "/api/projects/own", payload2, token)
+
+		AssertJSONResponse(t, resp2, 201, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			assert.Equal(t, "Second Project", data["title"])
+			// Position should be auto-assigned as 2
+			position := data["position"].(float64)
+			assert.Equal(t, float64(2), position, "Second project should have position 2")
+		})
+
+		// Create third project without specifying position
+		payload3 := map[string]interface{}{
+			"title":       "Third Project",
+			"description": "Third project in category",
+			"category_id": category.ID,
+		}
+		resp3 := MakeRequest(t, "POST", "/api/projects/own", payload3, token)
+
+		AssertJSONResponse(t, resp3, 201, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			assert.Equal(t, "Third Project", data["title"])
+			// Position should be auto-assigned as 3
+			position := data["position"].(float64)
+			assert.Equal(t, float64(3), position, "Third project should have position 3")
+		})
+
+		// Verify that projects in different categories get independent positions
+		category2 := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		payload4 := map[string]interface{}{
+			"title":       "First in Different Category",
+			"description": "Should have position 1",
+			"category_id": category2.ID,
+		}
+		resp4 := MakeRequest(t, "POST", "/api/projects/own", payload4, token)
+
+		AssertJSONResponse(t, resp4, 201, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			// Position should be 1 because it's a different category
+			position := data["position"].(float64)
+			assert.Equal(t, float64(1), position, "First project in different category should have position 1")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Success_ManualPositionRespected", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		// Create test data
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+
+		// Create project with explicit position
+		payload := map[string]interface{}{
+			"title":       "Project with Manual Position",
+			"description": "Explicit position 5",
+			"category_id": category.ID,
+			"position":    5,
+		}
+		resp := MakeRequest(t, "POST", "/api/projects/own", payload, token)
+
+		AssertJSONResponse(t, resp, 201, func(body map[string]interface{}) {
+			assert.Contains(t, body, "data")
+			data := body["data"].(map[string]interface{})
+			// Manual position should be respected
+			position := data["position"].(float64)
+			assert.Equal(t, float64(5), position, "Manual position should be respected")
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+}
