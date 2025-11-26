@@ -205,6 +205,103 @@ func CreateProjectPositionTrigger(db *gorm.DB) error {
 	return nil
 }
 
+// CreateSectionPositionTrigger creates a database trigger to automatically set
+// the position field for new sections based on the current maximum position
+// within the same portfolio. This ensures proper ordering without race conditions.
+func CreateSectionPositionTrigger(db *gorm.DB) error {
+	log.Println("Creating section position trigger...")
+
+	// Create the trigger function
+	if err := db.Exec(`
+		CREATE OR REPLACE FUNCTION set_section_position()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			-- Only set position if it's NULL or 0
+			IF NEW.position IS NULL OR NEW.position = 0 THEN
+				SELECT COALESCE(MAX(position) + 1, 1) INTO NEW.position
+				FROM sections
+				WHERE portfolio_id = NEW.portfolio_id
+				AND deleted_at IS NULL;
+			END IF;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create set_section_position function: %w", err)
+	}
+
+	// Drop trigger if it exists and create it
+	if err := db.Exec(`
+		DROP TRIGGER IF EXISTS before_insert_section ON sections;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to drop existing trigger: %w", err)
+	}
+
+	if err := db.Exec(`
+		CREATE TRIGGER before_insert_section
+		BEFORE INSERT ON sections
+		FOR EACH ROW
+		EXECUTE FUNCTION set_section_position();
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create before_insert_section trigger: %w", err)
+	}
+
+	log.Println("Section position trigger created successfully")
+	return nil
+}
+
+// BackfillSectionPositions sets proper sequential positions for existing sections
+// that have position=0. Groups by portfolio_id and assigns positions based on created_at.
+func BackfillSectionPositions(db *gorm.DB) error {
+	log.Println("Backfilling section positions for existing data...")
+
+	// Get all portfolios that have sections
+	var portfolioIDs []uint
+	if err := db.Raw(`
+		SELECT DISTINCT portfolio_id
+		FROM sections
+		WHERE deleted_at IS NULL
+		ORDER BY portfolio_id
+	`).Scan(&portfolioIDs).Error; err != nil {
+		return fmt.Errorf("failed to get portfolios with sections: %w", err)
+	}
+
+	updatedCount := 0
+	for _, portfolioID := range portfolioIDs {
+		// Get all sections for this portfolio ordered by created_at
+		var sections []struct {
+			ID uint
+		}
+		if err := db.Raw(`
+			SELECT id
+			FROM sections
+			WHERE portfolio_id = ?
+			AND deleted_at IS NULL
+			ORDER BY position ASC, created_at ASC
+		`, portfolioID).Scan(&sections).Error; err != nil {
+			log.Printf("Warning: failed to get sections for portfolio %d: %v", portfolioID, err)
+			continue
+		}
+
+		// Assign sequential positions starting from 1
+		for i, section := range sections {
+			newPosition := uint(i + 1)
+			if err := db.Exec(`
+				UPDATE sections
+				SET position = ?
+				WHERE id = ?
+			`, newPosition, section.ID).Error; err != nil {
+				log.Printf("Warning: failed to update position for section %d: %v", section.ID, err)
+			} else {
+				updatedCount++
+			}
+		}
+	}
+
+	log.Printf("Backfill complete: updated %d sections across %d portfolios", updatedCount, len(portfolioIDs))
+	return nil
+}
+
 // DropCategoryCountColumn removes the category_count field from portfolios table
 // This field is redundant and can cause sync issues; position is now managed by trigger
 func DropCategoryCountColumn(db *gorm.DB) error {

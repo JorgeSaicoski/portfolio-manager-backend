@@ -146,11 +146,21 @@ func (h *SectionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	reqJSON, _ := json.Marshal(newSection)
+	logrus.WithFields(logrus.Fields{
+		"userID":  userID,
+		"request": string(reqJSON),
+	}).Info("Parsed section creation request")
+
 	// Set the owner
 	newSection.OwnerID = userID
 
 	// Validate section data first (includes portfolioID check)
 	if err := validator.ValidateSection(&newSection); err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID": userID,
+			"error":  err.Error(),
+		}).Error("Section validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -158,11 +168,20 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	// Validate portfolio exists and belongs to user
 	portfolio, err := h.portfolioRepo.GetByIDBasic(newSection.PortfolioID)
 	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newSection.PortfolioID,
+		}).Error("Portfolio not found")
 		response.NotFound(c, "Portfolio not found")
 		return
 	}
 
 	if portfolio.OwnerID != userID {
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"portfolio_id": newSection.PortfolioID,
+			"owner_id":     portfolio.OwnerID,
+		}).Error("Access denied to portfolio")
 		response.ForbiddenWithDetails(c, "Access denied: portfolio belongs to another user", map[string]interface{}{
 			"resource_type": "portfolio",
 			"resource_id":   portfolio.ID,
@@ -183,17 +202,42 @@ func (h *SectionHandler) Create(c *gin.Context) {
 		return
 	}
 
+	logrus.WithFields(logrus.Fields{
+		"userID":       userID,
+		"title":        newSection.Title,
+		"portfolio_id": newSection.PortfolioID,
+	}).Info("Creating section - position will be set by database trigger")
+
 	// Create a section
 	if err := h.repo.Create(&newSection); err != nil {
 		// Check if error is due to foreign key constraint (invalid portfolio_id)
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "fk_portfolios_sections") || strings.Contains(errMsg, "23503") {
+			logrus.WithFields(logrus.Fields{
+				"userID":       userID,
+				"error":        err.Error(),
+				"portfolio_id": newSection.PortfolioID,
+			}).Error("Portfolio not found during section creation")
 			response.NotFound(c, "Portfolio not found")
 			return
 		}
+		logrus.WithFields(logrus.Fields{
+			"userID":       userID,
+			"error":        err.Error(),
+			"portfolio_id": newSection.PortfolioID,
+		}).Error("Failed to create section")
 		response.InternalError(c, "Failed to create section")
 		return
 	}
+
+	audit.GetCreateLogger().WithFields(logrus.Fields{
+		"operation":   "CREATE_SECTION",
+		"userID":      userID,
+		"sectionID":   newSection.ID,
+		"title":       newSection.Title,
+		"portfolioID": newSection.PortfolioID,
+		"position":    newSection.Position,
+	}).Info("Section created successfully")
 
 	response.Created(c, "section", &newSection, "Section created successfully")
 }
