@@ -1,7 +1,10 @@
 package repo
 
 import (
+	"fmt"
+
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
+	"github.com/sirupsen/logrus"
 	"gorm.io/gorm"
 )
 
@@ -22,7 +25,8 @@ func (r *sectionRepository) Create(section *models.Section) error {
 // GetByOwnerID For list views - only basic section info for a specific owner
 func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, error) {
 	var sections []models.Section
-	err := r.db.Where("owner_id = ?", ownerID).
+	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
+		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&sections).Error
@@ -50,20 +54,40 @@ func (r *sectionRepository) GetByIDWithRelations(id uint) (*models.Section, erro
 
 // GetByPortfolioID For list views - only basic portfolio info
 func (r *sectionRepository) GetByPortfolioID(portfolioID string) ([]models.Section, error) {
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+	}).Debug("Repository: GetByPortfolioID called")
+
 	var sections []models.Section
 	err := r.db.Select("id, title, position, owner_id, created_at, updated_at").
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
 		Find(&sections).Error
+
+	if err != nil {
+		logrus.WithFields(logrus.Fields{
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+			"errorType":   fmt.Sprintf("%T", err),
+		}).Error("Repository: Database query failed")
+		return nil, err
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+		"resultCount": len(sections),
+	}).Debug("Repository: Query successful")
+
 	return sections, err
 }
 
 // GetByPortfolioIDWithRelations For detail views - with contents preloaded
 func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([]models.Section, error) {
 	var sections []models.Section
-	err := r.db.Preload("Contents", func(db *gorm.DB) *gorm.DB {
-		return db.Order("section_contents.order ASC, section_contents.created_at ASC")
-	}).
+	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
+		Preload("Contents", func(db *gorm.DB) *gorm.DB {
+			return db.Order("section_contents.order ASC, section_contents.created_at ASC")
+		}).
 		Where("portfolio_id = ?", portfolioID).
 		Order("position ASC, created_at ASC").
 		Find(&sections).Error
@@ -72,7 +96,8 @@ func (r *sectionRepository) GetByPortfolioIDWithRelations(portfolioID string) ([
 
 func (r *sectionRepository) GetByType(sectionType string) ([]models.Section, error) {
 	var sections []models.Section
-	err := r.db.Where("type = ?", sectionType).
+	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
+		Where("type = ?", sectionType).
 		Find(&sections).Error
 	return sections, err
 }
@@ -92,7 +117,8 @@ func (r *sectionRepository) Delete(id uint) error {
 
 func (r *sectionRepository) List(limit, offset int) ([]models.Section, error) {
 	var sections []models.Section
-	err := r.db.Limit(limit).Offset(offset).
+	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
+		Limit(limit).Offset(offset).
 		Find(&sections).Error
 	return sections, err
 }

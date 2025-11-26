@@ -7,6 +7,7 @@ import (
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/errorlog"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
 	"github.com/sirupsen/logrus"
 	"gopkg.in/natefinch/lumberjack.v2"
@@ -17,6 +18,9 @@ func main() {
 
 	// Initialize audit loggers for CRUD operations
 	audit.Initialize()
+
+	// Initialize error loggers for 4xx and 5xx errors
+	errorlog.Initialize()
 
 	database := db.NewDatabase()
 	err := database.Initialize()
@@ -58,7 +62,23 @@ func setupLogger() *logrus.Logger {
 	auditDir := filepath.Join(".", "audit")
 	if err := os.MkdirAll(auditDir, 0755); err != nil {
 		logger.WithError(err).Error("Failed to create audit directory")
-	} else {
+	}
+
+	// Create upload directories if they don't exist
+	uploadDirs := []string{
+		filepath.Join(".", "uploads", "images", "original"),
+		filepath.Join(".", "uploads", "images", "thumbnail"),
+	}
+	for _, dir := range uploadDirs {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			logger.WithError(err).Errorf("Failed to create upload directory: %s", dir)
+		} else {
+			logger.Infof("Upload directory ready: %s", dir)
+		}
+	}
+
+	// Setup audit log rotation
+	{
 		// Setup main audit log with rotation (errors and important events only)
 		logFile := &lumberjack.Logger{
 			Filename:   filepath.Join(auditDir, "audit.log"),

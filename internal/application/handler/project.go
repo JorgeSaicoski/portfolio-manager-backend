@@ -126,7 +126,12 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	}
 
 	if portfolio.OwnerID != userID {
-		response.Forbidden(c, "Access denied: category belongs to another user's portfolio")
+		response.ForbiddenWithDetails(c, "Access denied: category belongs to another user's portfolio", map[string]interface{}{
+			"resource_type": "category",
+			"resource_id":   category.ID,
+			"owner_id":      portfolio.OwnerID,
+			"action":        "create_project",
+		})
 		return
 	}
 
@@ -191,7 +196,12 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 		return
 	}
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "project",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update",
+		})
 		return
 	}
 
@@ -239,7 +249,12 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	}
 
 	if project.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "project",
+			"resource_id":   project.ID,
+			"owner_id":      project.OwnerID,
+			"action":        "delete",
+		})
 		return
 	}
 
@@ -346,7 +361,12 @@ func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
 	}
 
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "project",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update_position",
+		})
 		return
 	}
 

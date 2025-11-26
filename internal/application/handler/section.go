@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -57,13 +58,45 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
+	// Extract portfolio ID from URL parameter
+	// This handler is used by two routes:
+	// 1. /api/portfolios/public/:id/sections
+	// 2. /api/sections/portfolio/:id
+	// Both use :id as the parameter name
 	portfolioID := c.Param("id")
+
+	// Validate portfolio ID parameter
+	if portfolioID == "" {
+		logrus.WithFields(logrus.Fields{
+			"handler":   "GetByPortfolio",
+			"path":      c.Request.URL.Path,
+			"allParams": c.Params,
+		}).Error("Portfolio ID parameter is missing or empty")
+		response.BadRequest(c, "Portfolio ID is required")
+		return
+	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID": portfolioID,
+		"handler":     "GetByPortfolio",
+		"path":        c.Request.URL.Path,
+	}).Info("GetByPortfolio handler called")
 
 	sections, err := h.repo.GetByPortfolioID(portfolioID)
 	if err != nil {
-		response.InternalError(c, "Failed to retrieve sections")
+		logrus.WithFields(logrus.Fields{
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+			"errorType":   fmt.Sprintf("%T", err),
+		}).Error("Failed to get sections from repository")
+		response.InternalErrorWithDetails(c, "Failed to retrieve sections", err)
 		return
 	}
+
+	logrus.WithFields(logrus.Fields{
+		"portfolioID":   portfolioID,
+		"sectionsCount": len(sections),
+	}).Info("Successfully retrieved sections")
 
 	response.OK(c, "sections", sections, "Success")
 }
@@ -130,7 +163,12 @@ func (h *SectionHandler) Create(c *gin.Context) {
 	}
 
 	if portfolio.OwnerID != userID {
-		response.Forbidden(c, "Access denied: portfolio belongs to another user")
+		response.ForbiddenWithDetails(c, "Access denied: portfolio belongs to another user", map[string]interface{}{
+			"resource_type": "portfolio",
+			"resource_id":   portfolio.ID,
+			"owner_id":      portfolio.OwnerID,
+			"action":        "create_section",
+		})
 		return
 	}
 
@@ -195,7 +233,12 @@ func (h *SectionHandler) Update(c *gin.Context) {
 		return
 	}
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update",
+		})
 		return
 	}
 
@@ -243,7 +286,12 @@ func (h *SectionHandler) Delete(c *gin.Context) {
 	}
 
 	if section.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   section.ID,
+			"owner_id":      section.OwnerID,
+			"action":        "delete",
+		})
 		return
 	}
 
@@ -301,7 +349,12 @@ func (h *SectionHandler) UpdatePosition(c *gin.Context) {
 	}
 
 	if existing.OwnerID != userID {
-		response.Forbidden(c, "Access denied")
+		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+			"resource_type": "section",
+			"resource_id":   existing.ID,
+			"owner_id":      existing.OwnerID,
+			"action":        "update_position",
+		})
 		return
 	}
 

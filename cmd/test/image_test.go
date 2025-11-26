@@ -55,7 +55,7 @@ func TestImage_Upload(t *testing.T) {
 		}
 
 		// Make request
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -89,7 +89,7 @@ func TestImage_Upload(t *testing.T) {
 			return
 		}
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -119,7 +119,7 @@ func TestImage_Upload(t *testing.T) {
 
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -162,7 +162,7 @@ func TestImage_Upload(t *testing.T) {
 
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 		req.Header.Set("Authorization", "Bearer "+token)
 
@@ -177,7 +177,7 @@ func TestImage_Upload(t *testing.T) {
 		writer := multipart.NewWriter(body)
 		writer.Close()
 
-		req, _ := http.NewRequest("POST", "/api/images/upload", body)
+		req, _ := http.NewRequest("POST", "/api/images/own", body)
 		req.Header.Set("Content-Type", writer.FormDataContentType())
 
 		resp := ExecuteRequest(req)
@@ -187,7 +187,7 @@ func TestImage_Upload(t *testing.T) {
 
 // TestImage_GetByEntity tests getting images for an entity
 func TestImage_GetByEntity(t *testing.T) {
-	token := GetTestAuthToken()
+	//token := GetTestAuthToken()
 	userID := GetTestUserID()
 
 	t.Run("Success_GetImages", func(t *testing.T) {
@@ -201,8 +201,8 @@ func TestImage_GetByEntity(t *testing.T) {
 		CreateTestImage(testDB.DB, project.ID, "project", userID)
 		CreateTestImage(testDB.DB, project.ID, "project", userID)
 
-		url := fmt.Sprintf("/api/images?entity_type=project&entity_id=%d", project.ID)
-		resp := MakeRequest(t, "GET", url, nil, token)
+		url := fmt.Sprintf("/api/images/entity/project/%d", project.ID)
+		resp := MakeRequest(t, "GET", url, nil, "")
 
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
@@ -213,14 +213,9 @@ func TestImage_GetByEntity(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
-	t.Run("Fail_MissingParameters", func(t *testing.T) {
-		resp := MakeRequest(t, "GET", "/api/images", nil, token)
+	t.Run("Fail_InvalidEntityID", func(t *testing.T) {
+		resp := MakeRequest(t, "GET", "/api/images/entity/project/invalid", nil, "")
 		assert.Equal(t, 400, resp.Code)
-	})
-
-	t.Run("Unauthorized_NoToken", func(t *testing.T) {
-		resp := MakeRequest(t, "GET", "/api/images?entity_type=project&entity_id=1", nil, "")
-		assert.Equal(t, 401, resp.Code)
 	})
 }
 
@@ -237,7 +232,7 @@ func TestImage_Delete(t *testing.T) {
 		project := CreateTestProject(testDB.DB, category.ID, userID)
 		image := CreateTestImage(testDB.DB, project.ID, "project", userID)
 
-		url := fmt.Sprintf("/api/images/%d", image.ID)
+		url := fmt.Sprintf("/api/images/own/%d", image.ID)
 		resp := MakeRequest(t, "DELETE", url, nil, token)
 
 		assert.Equal(t, 200, resp.Code)
@@ -248,7 +243,7 @@ func TestImage_Delete(t *testing.T) {
 	t.Run("Fail_NotFound", func(t *testing.T) {
 		cleanDatabase(testDB.DB)
 
-		resp := MakeRequest(t, "DELETE", "/api/images/99999", nil, token)
+		resp := MakeRequest(t, "DELETE", "/api/images/own/99999", nil, token)
 		assert.Equal(t, 403, resp.Code) // Forbidden because ownership check fails first
 
 		cleanDatabase(testDB.DB)
@@ -264,7 +259,7 @@ func TestImage_Delete(t *testing.T) {
 		project := CreateTestProject(testDB.DB, category.ID, otherUserID)
 		image := CreateTestImage(testDB.DB, project.ID, "project", otherUserID)
 
-		url := fmt.Sprintf("/api/images/%d", image.ID)
+		url := fmt.Sprintf("/api/images/own/%d", image.ID)
 		resp := MakeRequest(t, "DELETE", url, nil, token)
 
 		assert.Equal(t, 403, resp.Code) // Forbidden
@@ -273,7 +268,7 @@ func TestImage_Delete(t *testing.T) {
 	})
 
 	t.Run("Unauthorized_NoToken", func(t *testing.T) {
-		resp := MakeRequest(t, "DELETE", "/api/images/1", nil, "")
+		resp := MakeRequest(t, "DELETE", "/api/images/own/1", nil, "")
 		assert.Equal(t, 401, resp.Code)
 	})
 }
@@ -295,7 +290,7 @@ func TestImage_Update(t *testing.T) {
 			"alt": "Updated alt text",
 		}
 
-		url := fmt.Sprintf("/api/images/%d", image.ID)
+		url := fmt.Sprintf("/api/images/own/%d", image.ID)
 		resp := MakeRequest(t, "PUT", url, payload, token)
 
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
@@ -319,7 +314,7 @@ func TestImage_Update(t *testing.T) {
 			"is_main": true,
 		}
 
-		url := fmt.Sprintf("/api/images/%d", image.ID)
+		url := fmt.Sprintf("/api/images/own/%d", image.ID)
 		resp := MakeRequest(t, "PUT", url, payload, token)
 
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
@@ -345,7 +340,7 @@ func TestImage_Update(t *testing.T) {
 			"alt": "Trying to update someone else's image",
 		}
 
-		url := fmt.Sprintf("/api/images/%d", image.ID)
+		url := fmt.Sprintf("/api/images/own/%d", image.ID)
 		resp := MakeRequest(t, "PUT", url, payload, token)
 
 		assert.Equal(t, 403, resp.Code) // Forbidden
@@ -355,7 +350,7 @@ func TestImage_Update(t *testing.T) {
 
 	t.Run("Unauthorized_NoToken", func(t *testing.T) {
 		payload := map[string]interface{}{"alt": "Test"}
-		resp := MakeRequest(t, "PUT", "/api/images/1", payload, "")
+		resp := MakeRequest(t, "PUT", "/api/images/own/1", payload, "")
 		assert.Equal(t, 401, resp.Code)
 	})
 }

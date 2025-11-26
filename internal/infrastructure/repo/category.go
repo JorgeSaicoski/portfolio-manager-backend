@@ -83,7 +83,8 @@ func (r *categoryRepository) Delete(id uint) error {
 
 func (r *categoryRepository) List(limit, offset int) ([]models.Category, error) {
 	var categories []models.Category
-	err := r.db.Limit(limit).Offset(offset).
+	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
+		Limit(limit).Offset(offset).
 		Find(&categories).Error
 	return categories, err
 }
