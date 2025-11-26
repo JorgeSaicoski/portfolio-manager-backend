@@ -58,15 +58,30 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
+	// Extract portfolio ID from URL parameter
+	// This handler is used by two routes:
+	// 1. /api/portfolios/public/:id/sections
+	// 2. /api/sections/portfolio/:id
+	// Both use :id as the parameter name
+	portfolioID := c.Param("id")
 
-	portfolioID := c.Param("portfolioId")
+	// Validate portfolio ID parameter
+	if portfolioID == "" {
+		logrus.WithFields(logrus.Fields{
+			"handler":   "GetByPortfolio",
+			"path":      c.Request.URL.Path,
+			"allParams": c.Params,
+		}).Error("Portfolio ID parameter is missing or empty")
+		response.BadRequest(c, "Portfolio ID is required")
+		return
+	}
+
 	logrus.WithFields(logrus.Fields{
 		"portfolioID": portfolioID,
 		"handler":     "GetByPortfolio",
+		"path":        c.Request.URL.Path,
 	}).Info("GetByPortfolio handler called")
-	logrus.WithFields(logrus.Fields{
-		"portfolioID": portfolioID,
-	}).Debug("Calling repo.GetByPortfolioID")
+
 	sections, err := h.repo.GetByPortfolioID(portfolioID)
 	if err != nil {
 		logrus.WithFields(logrus.Fields{
@@ -81,12 +96,7 @@ func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
 	logrus.WithFields(logrus.Fields{
 		"portfolioID":   portfolioID,
 		"sectionsCount": len(sections),
-	}).Debug("Successfully retrieved sections")
-
-	if err != nil {
-		response.InternalError(c, "Failed to retrieve sections")
-		return
-	}
+	}).Info("Successfully retrieved sections")
 
 	response.OK(c, "sections", sections, "Success")
 }

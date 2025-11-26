@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"runtime/debug"
@@ -10,6 +11,7 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/errorlog"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"gorm.io/gorm"
 )
 
 // ErrorLogging middleware captures and logs all HTTP errors (4xx and 5xx)
@@ -155,6 +157,12 @@ func logServerError(c *gin.Context, status int, errorMsg, file string, line int,
 		}
 	}
 
+	// Get path parameters (URL params like :id, :portfolioId, etc.)
+	pathParams := make(map[string]string)
+	for _, param := range c.Params {
+		pathParams[param.Key] = param.Value
+	}
+
 	fields := logrus.Fields{
 		"request_id":  requestID,
 		"method":      c.Request.Method,
@@ -177,6 +185,17 @@ func logServerError(c *gin.Context, status int, errorMsg, file string, line int,
 		fields["query_params"] = queryParams
 	}
 
+	// Add path params if present
+	if len(pathParams) > 0 {
+		fields["path_params"] = pathParams
+	}
+
+	// Extract database error details if this is a GORM error
+	dbErrorDetails := extractDatabaseError(c)
+	if dbErrorDetails != "" {
+		fields["database_error"] = dbErrorDetails
+	}
+
 	logger.WithFields(fields).Error("Server error occurred")
 }
 
@@ -193,6 +212,12 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 		if len(values) > 0 {
 			queryParams[key] = values[0]
 		}
+	}
+
+	// Get path parameters
+	pathParams := make(map[string]string)
+	for _, param := range c.Params {
+		pathParams[param.Key] = param.Value
 	}
 
 	fields := logrus.Fields{
@@ -216,7 +241,67 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 		fields["query_params"] = queryParams
 	}
 
+	// Add path params if present
+	if len(pathParams) > 0 {
+		fields["path_params"] = pathParams
+	}
+
 	logger.WithFields(fields).Warn("Client error occurred")
+}
+
+// extractDatabaseError extracts detailed database error information from GORM errors
+func extractDatabaseError(c *gin.Context) string {
+	// Check Gin's error context for database errors
+	if len(c.Errors) > 0 {
+		for _, ginErr := range c.Errors {
+			err := ginErr.Err
+
+			// Check if it's a GORM error
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return "Record not found in database"
+			}
+			if errors.Is(err, gorm.ErrInvalidTransaction) {
+				return "Invalid database transaction"
+			}
+			if errors.Is(err, gorm.ErrInvalidData) {
+				return "Invalid data for database operation"
+			}
+
+			// For other database errors, extract the error message
+			// GORM wraps database driver errors, so we need to unwrap them
+			errMsg := err.Error()
+
+			// Common PostgreSQL error patterns
+			if strings.Contains(errMsg, "SQLSTATE") {
+				// Extract the SQL error code and message
+				// Example: "ERROR: invalid input syntax for type bigint: \"\" (SQLSTATE 22P02)"
+				return errMsg
+			}
+
+			// Check for common database error keywords
+			if strings.Contains(errMsg, "duplicate key") ||
+				strings.Contains(errMsg, "foreign key constraint") ||
+				strings.Contains(errMsg, "violates check constraint") ||
+				strings.Contains(errMsg, "syntax error") ||
+				strings.Contains(errMsg, "invalid input") ||
+				strings.Contains(errMsg, "does not exist") {
+				return errMsg
+			}
+		}
+	}
+
+	// Check stored error value
+	if err, exists := c.Get("error"); exists {
+		if errStr, ok := err.(string); ok {
+			if strings.Contains(errStr, "SQLSTATE") ||
+				strings.Contains(errStr, "database") ||
+				strings.Contains(errStr, "SQL") {
+				return errStr
+			}
+		}
+	}
+
+	return ""
 }
 
 // getErrorMessage extracts error message from gin context or response
