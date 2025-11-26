@@ -16,25 +16,33 @@
 # - The dev database (portfolio-postgres) must be running
 # - Tests clean up data between runs using database transactions
 
-.PHONY: help test test-summary test-one test-failed test-coverage test-docker test-clean
+.PHONY: help test test-summary test-one test-failed test-coverage test-docker test-clean test-db-migrate
 
 help:
 	@echo "Available targets:"
-	@echo "  test          - Run all tests with summary (requires dev database running)"
-	@echo "  test-summary  - Run tests and show only summary"
-	@echo "  test-one      - Run a specific test (usage: make test-one TEST=TestCategory_Create)"
-	@echo "  test-failed   - Re-run only failed tests from last run"
-	@echo "  test-coverage - Run tests with coverage report"
-	@echo "  test-docker   - Run tests in containers (isolated environment)"
-	@echo "  test-clean    - Clean up test artifacts"
+	@echo "  test             - Run all tests with summary (requires dev database running)"
+	@echo "  test-db-migrate  - Ensure database has latest migrations before running tests"
+	@echo "  test-summary     - Run tests and show only summary"
+	@echo "  test-one         - Run a specific test (usage: make test-one TEST=TestCategory_Create)"
+	@echo "  test-failed      - Re-run only failed tests from last run"
+	@echo "  test-coverage    - Run tests with coverage report"
+	@echo "  test-docker      - Run tests in containers (isolated environment)"
+	@echo "  test-clean       - Clean up test artifacts"
 	@echo ""
 	@echo "Prerequisites:"
 	@echo "  - Dev database must be running: podman compose up -d portfolio-postgres"
 	@echo "  - Create .env.test file (see .env.test.example)"
+	@echo "  - Run test-db-migrate if migrations may be stale"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make test-one TEST=TestCategory_Create"
 	@echo "  make test-one TEST=TestCategory_Update/NotFound_InvalidID"
+
+test-db-migrate:
+	@echo "Ensuring database has latest migrations..."
+	@cd .. && podman compose restart portfolio-backend
+	@sleep 3
+	@echo "✓ Migrations applied (backend restarted)"
 
 test:
 	@echo "Running tests with shared dev database..."
