@@ -120,6 +120,11 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("failed to create category position trigger: %w", err)
 	}
 
+	// Create trigger for automatic project position assignment
+	if err := CreateProjectPositionTrigger(d.DB); err != nil {
+		return fmt.Errorf("failed to create project position trigger: %w", err)
+	}
+
 	// Drop the redundant category_count column from portfolios
 	if err := DropCategoryCountColumn(d.DB); err != nil {
 		return fmt.Errorf("failed to drop category_count column: %w", err)
