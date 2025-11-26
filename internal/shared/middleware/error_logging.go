@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/errorlog"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -264,6 +265,34 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 	}
 
 	logger.WithFields(fields).Warn("Client error occurred")
+
+	// Automatically log all 400 errors to audit log
+	if status == 400 {
+		auditLogger := audit.GetBadRequestLogger()
+		auditFields := logrus.Fields{
+			"operation":  "BAD_REQUEST",
+			"method":     c.Request.Method,
+			"path":       c.Request.URL.Path,
+			"status":     status,
+			"error":      errorMsg,
+			"user_id":    userID,
+			"ip":         c.ClientIP(),
+			"handler":    function,
+			"latency_ms": latency.Milliseconds(),
+		}
+
+		// Add query params if present
+		if len(queryParams) > 0 {
+			auditFields["query_params"] = queryParams
+		}
+
+		// Add path params if present
+		if len(pathParams) > 0 {
+			auditFields["path_params"] = pathParams
+		}
+
+		auditLogger.WithFields(auditFields).Info("Bad request captured")
+	}
 }
 
 // extractDatabaseError extracts detailed database error information from GORM errors
