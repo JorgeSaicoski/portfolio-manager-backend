@@ -59,7 +59,9 @@ func (r *portfolioRepository) Delete(id uint) error {
 
 func (r *portfolioRepository) List(limit, offset int) ([]models.Portfolio, error) {
 	var portfolios []models.Portfolio
-	err := r.db.Preload("Sections").Preload("Categories").
+	err := r.db.Select("id, title, description, owner_id, created_at, updated_at").
+		Preload("Sections").
+		Preload("Categories").
 		Limit(limit).Offset(offset).
 		Find(&portfolios).Error
 	return portfolios, err
