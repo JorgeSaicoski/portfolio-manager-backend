@@ -160,6 +160,51 @@ func CreateCategoryPositionTrigger(db *gorm.DB) error {
 	return nil
 }
 
+// CreateProjectPositionTrigger creates a database trigger to automatically set
+// the position field for new projects based on the current maximum position
+// within the same category. This ensures proper ordering without race conditions.
+func CreateProjectPositionTrigger(db *gorm.DB) error {
+	log.Println("Creating project position trigger...")
+
+	// Create the trigger function
+	if err := db.Exec(`
+		CREATE OR REPLACE FUNCTION set_project_position()
+		RETURNS TRIGGER AS $$
+		BEGIN
+			-- Only set position if it's NULL or 0
+			IF NEW.position IS NULL OR NEW.position = 0 THEN
+				SELECT COALESCE(MAX(position) + 1, 1) INTO NEW.position
+				FROM projects
+				WHERE category_id = NEW.category_id
+				AND deleted_at IS NULL;
+			END IF;
+			RETURN NEW;
+		END;
+		$$ LANGUAGE plpgsql;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create set_project_position function: %w", err)
+	}
+
+	// Drop trigger if it exists and create it
+	if err := db.Exec(`
+		DROP TRIGGER IF EXISTS before_insert_project ON projects;
+	`).Error; err != nil {
+		return fmt.Errorf("failed to drop existing trigger: %w", err)
+	}
+
+	if err := db.Exec(`
+		CREATE TRIGGER before_insert_project
+		BEFORE INSERT ON projects
+		FOR EACH ROW
+		EXECUTE FUNCTION set_project_position();
+	`).Error; err != nil {
+		return fmt.Errorf("failed to create before_insert_project trigger: %w", err)
+	}
+
+	log.Println("Project position trigger created successfully")
+	return nil
+}
+
 // DropCategoryCountColumn removes the category_count field from portfolios table
 // This field is redundant and can cause sync issues; position is now managed by trigger
 func DropCategoryCountColumn(db *gorm.DB) error {

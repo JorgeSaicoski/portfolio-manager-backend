@@ -16,7 +16,11 @@ func NewProjectRepository(db *gorm.DB) ProjectRepository {
 }
 
 func (r *projectRepository) Create(project *models.Project) error {
-	return r.db.Create(project).Error
+	if err := r.db.Create(project).Error; err != nil {
+		return err
+	}
+	// Reload the record to pick up any database-side defaults or trigger modifications
+	return r.db.Where("id = ?", project.ID).First(project).Error
 }
 
 // GetByID For basic project info
