@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
