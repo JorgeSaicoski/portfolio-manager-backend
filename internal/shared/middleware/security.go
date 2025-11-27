@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 // SecurityHeaders adds security-related HTTP headers to all responses
@@ -67,6 +69,15 @@ func RequestSizeLimit() gin.HandlerFunc {
 
 		// Check if body was too large
 		if c.Writer.Status() == http.StatusRequestEntityTooLarge {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "REQUEST_SIZE_LIMIT_EXCEEDED",
+				"where":     "backend/internal/shared/middleware/security.go",
+				"function":  "RequestSizeLimit",
+				"ip":        c.ClientIP(),
+				"path":      c.Request.URL.Path,
+				"method":    c.Request.Method,
+				"max_size":  maxSize,
+			}).Warn("Request body too large")
 			c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{
 				"error": fmt.Sprintf("Request body too large. Maximum size is %d bytes", maxSize),
 			})

@@ -12,6 +12,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
+	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 var (
@@ -107,6 +108,13 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Get Authorization header
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "AUTH_MIDDLEWARE_NO_HEADER",
+				"where":     "backend/internal/shared/middleware/auth.go",
+				"function":  "AuthMiddleware",
+				"ip":        c.ClientIP(),
+				"path":      c.Request.URL.Path,
+			}).Warn("Authorization header required")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Authorization header required"})
 			c.Abort()
 			return
@@ -115,6 +123,13 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Check Bearer token format
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "AUTH_MIDDLEWARE_INVALID_FORMAT",
+				"where":     "backend/internal/shared/middleware/auth.go",
+				"function":  "AuthMiddleware",
+				"ip":        c.ClientIP(),
+				"path":      c.Request.URL.Path,
+			}).Warn("Invalid authorization format")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authorization format"})
 			c.Abort()
 			return
@@ -135,6 +150,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		// Ensure OIDC is initialized
 		if err := InitOIDC(); err != nil {
 			logger.WithError(err).Error("OIDC not initialized")
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "AUTH_MIDDLEWARE_OIDC_INIT_FAILED",
+				"where":     "backend/internal/shared/middleware/auth.go",
+				"function":  "AuthMiddleware",
+				"ip":        c.ClientIP(),
+				"path":      c.Request.URL.Path,
+				"error":     err.Error(),
+			}).Error("OIDC not initialized")
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Authentication service unavailable"})
 			c.Abort()
 			return
@@ -148,6 +171,15 @@ func AuthMiddleware() gin.HandlerFunc {
 		idToken, err := oidcVerifier.Verify(ctx, accessToken)
 		if err != nil {
 			logger.WithError(err).WithField("token_prefix", accessToken[:smaller(20, len(accessToken))]).Warn("Token verification failed")
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation":    "AUTH_MIDDLEWARE_TOKEN_VERIFICATION_FAILED",
+				"where":        "backend/internal/shared/middleware/auth.go",
+				"function":     "AuthMiddleware",
+				"ip":           c.ClientIP(),
+				"path":         c.Request.URL.Path,
+				"token_prefix": accessToken[:smaller(20, len(accessToken))],
+				"error":        err.Error(),
+			}).Warn("Token verification failed")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 			c.Abort()
 			return
@@ -157,6 +189,14 @@ func AuthMiddleware() gin.HandlerFunc {
 		var user User
 		if err := idToken.Claims(&user); err != nil {
 			logger.WithError(err).Error("Failed to extract claims from token")
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "AUTH_MIDDLEWARE_CLAIMS_EXTRACTION_FAILED",
+				"where":     "backend/internal/shared/middleware/auth.go",
+				"function":  "AuthMiddleware",
+				"ip":        c.ClientIP(),
+				"path":      c.Request.URL.Path,
+				"error":     err.Error(),
+			}).Error("Failed to extract claims from token")
 			c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid token claims"})
 			c.Abort()
 			return

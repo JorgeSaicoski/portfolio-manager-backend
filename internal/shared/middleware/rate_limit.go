@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/sirupsen/logrus"
+	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 // RateLimiter manages rate limiting per IP address
@@ -138,6 +140,14 @@ func RateLimit() gin.HandlerFunc {
 
 		// Check if request is allowed
 		if !limiter.isAllowed(ip) {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "RATE_LIMIT_EXCEEDED",
+				"where":     "backend/internal/shared/middleware/rate_limit.go",
+				"function":  "RateLimit",
+				"ip":        ip,
+				"path":      c.Request.URL.Path,
+				"method":    c.Request.Method,
+			}).Warn("Rate limit exceeded")
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Rate limit exceeded. Please try again later.",
 			})
