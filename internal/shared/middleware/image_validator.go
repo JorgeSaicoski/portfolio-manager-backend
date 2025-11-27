@@ -23,7 +23,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 		// Get the uploaded file
 		file, err := c.FormFile("file")
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_UPLOAD_NO_FILE",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageUpload",
@@ -36,7 +36,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 
 		// Validate file size
 		if file.Size > MaxImageFileSize {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_UPLOAD_FILE_TOO_LARGE",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageUpload",
@@ -52,7 +52,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 		// Validate image format by actually decoding the file
 		src, err := file.Open()
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_UPLOAD_FILE_OPEN_ERROR",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageUpload",
@@ -64,7 +64,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 		}
 		defer func() {
 			if cerr := src.Close(); cerr != nil {
-				audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+				audit.GetErrorLogger().WithFields(map[string]interface{}{
 					"operation": "VALIDATE_IMAGE_UPLOAD_FILE_CLOSE_ERROR",
 					"where":     "backend/internal/shared/middleware/image_validator.go",
 					"function":  "ValidateImageUpload",
@@ -76,7 +76,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 		// Try to decode the image to ensure it's valid and detect format
 		_, format, err := image.DecodeConfig(src)
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_UPLOAD_DECODE_ERROR",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageUpload",
@@ -95,7 +95,7 @@ func ValidateImageUpload() gin.HandlerFunc {
 		}
 
 		if !allowedFormats[format] {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":     "VALIDATE_IMAGE_UPLOAD_INVALID_FORMAT",
 				"where":         "backend/internal/shared/middleware/image_validator.go",
 				"function":      "ValidateImageUpload",
@@ -121,7 +121,7 @@ func ValidateImageOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		imageIDStr := c.Param("id")
 		imageID, err := strconv.ParseUint(imageIDStr, 10, 32)
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":  "VALIDATE_IMAGE_OWNERSHIP_INVALID_ID",
 				"where":      "backend/internal/shared/middleware/image_validator.go",
 				"function":   "ValidateImageOwnership",
@@ -136,7 +136,7 @@ func ValidateImageOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		// Get user ID from context (set by AuthMiddleware)
 		userID, exists := c.Get("userID")
 		if !exists {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_OWNERSHIP_NO_USER",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageOwnership",
@@ -150,7 +150,7 @@ func ValidateImageOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		// Check ownership
 		isOwner, err := imageRepo.CheckOwnership(uint(imageID), userID.(string))
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_OWNERSHIP_DB_ERROR",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageOwnership",
@@ -164,7 +164,7 @@ func ValidateImageOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		}
 
 		if !isOwner {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_IMAGE_OWNERSHIP_FORBIDDEN",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateImageOwnership",
@@ -188,7 +188,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		entityIDStr := c.PostForm("entity_id")
 
 		if entityType == "" || entityIDStr == "" {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":   "VALIDATE_ENTITY_OWNERSHIP_MISSING_PARAMS",
 				"where":       "backend/internal/shared/middleware/image_validator.go",
 				"function":    "ValidateEntityOwnership",
@@ -202,7 +202,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 
 		entityID, err := strconv.ParseUint(entityIDStr, 10, 32)
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":   "VALIDATE_ENTITY_OWNERSHIP_INVALID_ID",
 				"where":       "backend/internal/shared/middleware/image_validator.go",
 				"function":    "ValidateEntityOwnership",
@@ -217,7 +217,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		// Get user ID from context
 		userID, exists := c.Get("userID")
 		if !exists {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation": "VALIDATE_ENTITY_OWNERSHIP_NO_USER",
 				"where":     "backend/internal/shared/middleware/image_validator.go",
 				"function":  "ValidateEntityOwnership",
@@ -236,7 +236,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		}
 
 		if !validEntityTypes[entityType] {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":  "VALIDATE_ENTITY_OWNERSHIP_INVALID_TYPE",
 				"where":      "backend/internal/shared/middleware/image_validator.go",
 				"function":   "ValidateEntityOwnership",
@@ -253,7 +253,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		// Check entity ownership using the repository method
 		isOwner, err := imageRepo.CheckEntityOwnership(uint(entityID), entityType, userID.(string))
 		if err != nil {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":  "VALIDATE_ENTITY_OWNERSHIP_DB_ERROR",
 				"where":      "backend/internal/shared/middleware/image_validator.go",
 				"function":   "ValidateEntityOwnership",
@@ -268,7 +268,7 @@ func ValidateEntityOwnership(imageRepo repo.ImageRepository) gin.HandlerFunc {
 		}
 
 		if !isOwner {
-			audit.GetBadRequestLogger().WithFields(map[string]interface{}{
+			audit.GetErrorLogger().WithFields(map[string]interface{}{
 				"operation":  "VALIDATE_ENTITY_OWNERSHIP_FORBIDDEN",
 				"where":      "backend/internal/shared/middleware/image_validator.go",
 				"function":   "ValidateEntityOwnership",

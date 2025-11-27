@@ -10,11 +10,11 @@ import (
 )
 
 var (
-	CreateLogger     *logrus.Logger
-	UpdateLogger     *logrus.Logger
-	DeleteLogger     *logrus.Logger
-	BadRequestLogger *logrus.Logger
-	once             sync.Once
+	CreateLogger *logrus.Logger
+	UpdateLogger *logrus.Logger
+	DeleteLogger *logrus.Logger
+	ErrorLogger  *logrus.Logger
+	once         sync.Once
 )
 
 // Initialize sets up all audit loggers
@@ -23,7 +23,7 @@ func Initialize() {
 		CreateLogger = setupAuditLogger("create.log")
 		UpdateLogger = setupAuditLogger("update.log")
 		DeleteLogger = setupAuditLogger("delete.log")
-		BadRequestLogger = setupAuditLogger("bad_request.log")
+		ErrorLogger = setupAuditLogger("error.log")
 	})
 }
 
@@ -51,12 +51,12 @@ func GetDeleteLogger() *logrus.Logger {
 	return DeleteLogger
 }
 
-// GetBadRequestLogger returns BadRequestLogger, initializing if needed
-func GetBadRequestLogger() *logrus.Logger {
-	if BadRequestLogger == nil {
+// GetErrorLogger returns ErrorLogger, initializing if needed
+func GetErrorLogger() *logrus.Logger {
+	if ErrorLogger == nil {
 		Initialize()
 	}
-	return BadRequestLogger
+	return ErrorLogger
 }
 
 // setupAuditLogger creates a dedicated logger for specific CRUD operations

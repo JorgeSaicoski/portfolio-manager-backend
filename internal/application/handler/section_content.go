@@ -38,6 +38,13 @@ func (h *SectionContentHandler) Create(c *gin.Context) {
 	// Parse request body
 	var req request.CreateSectionContentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_SECTION_CONTENT_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Create",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		resp.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -45,17 +52,43 @@ func (h *SectionContentHandler) Create(c *gin.Context) {
 	// Check if section exists and belongs to user's portfolio
 	section, err := h.sectionRepo.GetByID(req.SectionID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_SECTION_CONTENT_SECTION_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Create",
+			"userID":    userID,
+			"sectionID": req.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section not found")
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
 	portfolio, err := h.portfolioRepo.GetByIDBasic(section.PortfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_SECTION_CONTENT_PORTFOLIO_NOT_FOUND",
+			"where":       "backend/internal/application/handler/section_content.go",
+			"function":    "Create",
+			"userID":      userID,
+			"sectionID":   req.SectionID,
+			"portfolioID": section.PortfolioID,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		resp.NotFound(c, "Portfolio not found")
 		return
 	}
 
 	if portfolio.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_SECTION_CONTENT_FORBIDDEN",
+			"where":       "backend/internal/application/handler/section_content.go",
+			"function":    "Create",
+			"userID":      userID,
+			"sectionID":   req.SectionID,
+			"portfolioID": section.PortfolioID,
+			"ownerID":     portfolio.OwnerID,
+		}).Warn("Access denied: section belongs to another user's portfolio")
 		resp.Forbidden(c, "Access denied: section belongs to another user's portfolio")
 		return
 	}
@@ -77,12 +110,28 @@ func (h *SectionContentHandler) Create(c *gin.Context) {
 
 	// Validate content
 	if err := validator.ValidateSectionContent(content); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_SECTION_CONTENT_VALIDATION_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Create",
+			"userID":    userID,
+			"sectionID": req.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section content validation failed")
 		resp.BadRequest(c, err.Error())
 		return
 	}
 
 	// Create content
 	if err := h.repo.Create(content); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_SECTION_CONTENT_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Create",
+			"userID":    userID,
+			"sectionID": req.SectionID,
+			"error":     err.Error(),
+		}).Error("Failed to create content")
 		resp.InternalError(c, "Failed to create content")
 		return
 	}
@@ -97,6 +146,13 @@ func (h *SectionContentHandler) GetBySectionID(c *gin.Context) {
 	// Parse section ID
 	id, err := strconv.ParseUint(sectionID, 10, 32)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_SECTION_CONTENTS_INVALID_ID",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "GetBySectionID",
+			"sectionID": sectionID,
+			"error":     err.Error(),
+		}).Warn("Invalid section ID")
 		resp.BadRequest(c, "Invalid section ID")
 		return
 	}
@@ -104,6 +160,13 @@ func (h *SectionContentHandler) GetBySectionID(c *gin.Context) {
 	// Get contents
 	contents, err := h.repo.GetBySectionID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_SECTION_CONTENTS_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "GetBySectionID",
+			"sectionID": id,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve contents")
 		resp.InternalError(c, "Failed to retrieve contents")
 		return
 	}
@@ -118,6 +181,13 @@ func (h *SectionContentHandler) GetByID(c *gin.Context) {
 	// Parse content ID
 	id, err := strconv.Atoi(contentID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_SECTION_CONTENT_INVALID_ID",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "GetByID",
+			"contentID": contentID,
+			"error":     err.Error(),
+		}).Warn("Invalid content ID")
 		resp.BadRequest(c, "Invalid content ID")
 		return
 	}
@@ -125,6 +195,13 @@ func (h *SectionContentHandler) GetByID(c *gin.Context) {
 	// Get content
 	content, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_SECTION_CONTENT_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "GetByID",
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Content not found")
 		resp.NotFound(c, "Content not found")
 		return
 	}
@@ -140,6 +217,14 @@ func (h *SectionContentHandler) Update(c *gin.Context) {
 	// Parse content ID
 	id, err := strconv.Atoi(contentID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_INVALID_ID",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": contentID,
+			"error":     err.Error(),
+		}).Warn("Invalid content ID")
 		resp.BadRequest(c, "Invalid content ID")
 		return
 	}
@@ -147,6 +232,14 @@ func (h *SectionContentHandler) Update(c *gin.Context) {
 	// Get existing content
 	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Content not found")
 		resp.NotFound(c, "Content not found")
 		return
 	}
@@ -154,11 +247,29 @@ func (h *SectionContentHandler) Update(c *gin.Context) {
 	// Check if section belongs to user
 	section, err := h.sectionRepo.GetByID(existing.SectionID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_SECTION_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section not found")
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
 	if section.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_FORBIDDEN",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"ownerID":   section.OwnerID,
+		}).Warn("Access denied")
 		resp.Forbidden(c, "Access denied")
 		return
 	}
@@ -166,6 +277,14 @@ func (h *SectionContentHandler) Update(c *gin.Context) {
 	// Parse request body
 	var req request.UpdateSectionContentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		resp.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -186,12 +305,30 @@ func (h *SectionContentHandler) Update(c *gin.Context) {
 
 	// Validate content
 	if err := validator.ValidateSectionContent(existing); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_VALIDATION_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section content validation failed")
 		resp.BadRequest(c, err.Error())
 		return
 	}
 
 	// Update content
 	if err := h.repo.Update(existing); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Update",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Error("Failed to update content")
 		resp.InternalError(c, "Failed to update content")
 		return
 	}
@@ -207,6 +344,14 @@ func (h *SectionContentHandler) UpdateOrder(c *gin.Context) {
 	// Parse content ID
 	id, err := strconv.Atoi(contentID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_INVALID_ID",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": contentID,
+			"error":     err.Error(),
+		}).Warn("Invalid content ID")
 		resp.BadRequest(c, "Invalid content ID")
 		return
 	}
@@ -214,6 +359,14 @@ func (h *SectionContentHandler) UpdateOrder(c *gin.Context) {
 	// Get existing content
 	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Content not found")
 		resp.NotFound(c, "Content not found")
 		return
 	}
@@ -221,11 +374,29 @@ func (h *SectionContentHandler) UpdateOrder(c *gin.Context) {
 	// Check if section belongs to user
 	section, err := h.sectionRepo.GetByID(existing.SectionID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_SECTION_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section not found")
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
 	if section.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_FORBIDDEN",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"ownerID":   section.OwnerID,
+		}).Warn("Access denied")
 		resp.Forbidden(c, "Access denied")
 		return
 	}
@@ -233,12 +404,29 @@ func (h *SectionContentHandler) UpdateOrder(c *gin.Context) {
 	// Parse request body
 	var req request.UpdateSectionContentOrderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		resp.BadRequest(c, "Invalid request data")
 		return
 	}
 
 	// Update order
 	if err := h.repo.UpdateOrder(uint(id), req.Order); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_SECTION_CONTENT_ORDER_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "UpdateOrder",
+			"userID":    userID,
+			"contentID": id,
+			"order":     req.Order,
+			"error":     err.Error(),
+		}).Error("Failed to update content order")
 		resp.InternalError(c, "Failed to update content order")
 		return
 	}
@@ -254,6 +442,14 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 	// Parse content ID
 	id, err := strconv.Atoi(contentID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_INVALID_ID",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"contentID": contentID,
+			"error":     err.Error(),
+		}).Warn("Invalid content ID")
 		resp.BadRequest(c, "Invalid content ID")
 		return
 	}
@@ -261,6 +457,14 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 	// Get existing content
 	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"contentID": id,
+			"error":     err.Error(),
+		}).Warn("Content not found")
 		resp.NotFound(c, "Content not found")
 		return
 	}
@@ -268,18 +472,39 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 	// Check if section belongs to user
 	section, err := h.sectionRepo.GetByID(existing.SectionID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_SECTION_NOT_FOUND",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"error":     err.Error(),
+		}).Warn("Section not found")
 		resp.NotFound(c, "Section not found")
 		return
 	}
 
 	if section.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_FORBIDDEN",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"contentID": id,
+			"sectionID": existing.SectionID,
+			"ownerID":   section.OwnerID,
+		}).Warn("Access denied")
 		resp.Forbidden(c, "Access denied")
 		return
 	}
 
 	// Delete content
 	if err := h.repo.Delete(uint(id)); err != nil {
-		logrus.WithFields(logrus.Fields{
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
 			"contentID": id,
 			"userID":    userID,
 			"sectionID": existing.SectionID,

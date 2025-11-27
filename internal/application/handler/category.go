@@ -51,6 +51,13 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 
 	categories, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_CATEGORIES_BY_USER_DB_ERROR",
+			"where":     "backend/internal/application/handler/category.go",
+			"function":  "GetByUser",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve categories")
 		response.InternalError(c, "Failed to retrieve categories")
 		return
 	}
@@ -64,6 +71,14 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	// Parse category ID
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_INVALID_ID",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Update",
+			"userID":     userID,
+			"categoryID": categoryID,
+			"error":      err.Error(),
+		}).Warn("Invalid category ID")
 		response.BadRequest(c, "Invalid category ID")
 		return
 	}
@@ -71,6 +86,14 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	// Parse request body
 	var updateData models.Category
 	if err := c.ShouldBindJSON(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_BAD_REQUEST",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Update",
+			"userID":     userID,
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -81,6 +104,15 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 
 	// Validate category data
 	if err := validator.ValidateCategory(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_CATEGORY_VALIDATION_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Update",
+			"userID":      userID,
+			"categoryID":  id,
+			"portfolioID": updateData.PortfolioID,
+			"error":       err.Error(),
+		}).Warn("Category validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -88,11 +120,27 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 	// Check if category exists and belongs to user
 	existing, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_NOT_FOUND",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Update",
+			"userID":     userID,
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Category not found")
 		response.NotFound(c, "Category not found")
 		return
 	}
 
 	if existing.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_FORBIDDEN",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Update",
+			"userID":     userID,
+			"categoryID": id,
+			"ownerID":    existing.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "category",
 			"resource_id":   existing.ID,
@@ -104,6 +152,15 @@ func (h *CategoryHandler) Update(c *gin.Context) {
 
 	// Update category
 	if err := h.repo.Update(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_CATEGORY_DB_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Update",
+			"userID":      userID,
+			"categoryID":  id,
+			"portfolioID": updateData.PortfolioID,
+			"error":       err.Error(),
+		}).Error("Failed to update category")
 		response.InternalError(c, "Failed to update category")
 		return
 	}
@@ -123,10 +180,13 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	// Parse request body
 	var newCategory models.Category
 	if err := c.ShouldBindJSON(&newCategory); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID": userID,
-			"error":  err.Error(),
-		}).Error("Failed to parse category creation request")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_CATEGORY_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/category.go",
+			"function":  "Create",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("Failed to parse category creation request")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -143,10 +203,14 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 
 	// Validate category data
 	if err := validator.ValidateCategory(&newCategory); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID": userID,
-			"error":  err.Error(),
-		}).Error("Category validation failed")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_CATEGORY_VALIDATION_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Create",
+			"userID":      userID,
+			"portfolioID": newCategory.PortfolioID,
+			"error":       err.Error(),
+		}).Warn("Category validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -154,20 +218,27 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 	// Validate that the portfolio exists and belongs to the user
 	portfolio, err := h.portfolioRepo.GetByIDBasic(newCategory.PortfolioID)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"portfolio_id": newCategory.PortfolioID,
-		}).Error("Portfolio not found")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_CATEGORY_PORTFOLIO_NOT_FOUND",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Create",
+			"userID":      userID,
+			"portfolioID": newCategory.PortfolioID,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		response.NotFound(c, "Portfolio not found")
 		return
 	}
 
 	if portfolio.OwnerID != userID {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"portfolio_id": newCategory.PortfolioID,
-			"owner_id":     portfolio.OwnerID,
-		}).Error("Access denied to portfolio")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_CATEGORY_FORBIDDEN",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Create",
+			"userID":      userID,
+			"portfolioID": newCategory.PortfolioID,
+			"ownerID":     portfolio.OwnerID,
+		}).Warn("Access denied to portfolio")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "portfolio",
 			"resource_id":   portfolio.ID,
@@ -185,10 +256,13 @@ func (h *CategoryHandler) Create(c *gin.Context) {
 
 	// Create category (position is automatically set by database trigger)
 	if err := h.repo.Create(&newCategory); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID":       userID,
-			"error":        err.Error(),
-			"portfolio_id": newCategory.PortfolioID,
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_CATEGORY_DB_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Create",
+			"userID":      userID,
+			"portfolioID": newCategory.PortfolioID,
+			"error":       err.Error(),
 		}).Error("Failed to create category")
 		response.InternalError(c, "Failed to create category")
 		return
@@ -211,6 +285,14 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_CATEGORY_INVALID_ID",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Delete",
+			"userID":     userID,
+			"categoryID": categoryID,
+			"error":      err.Error(),
+		}).Warn("Invalid category ID")
 		response.BadRequest(c, "Invalid category ID")
 		return
 	}
@@ -218,11 +300,27 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 	// Fetch category to check ownership and get portfolio_id
 	category, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_CATEGORY_NOT_FOUND",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Delete",
+			"userID":     userID,
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Category not found")
 		response.NotFound(c, "Category not found")
 		return
 	}
 
 	if category.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_CATEGORY_FORBIDDEN",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "Delete",
+			"userID":     userID,
+			"categoryID": id,
+			"ownerID":    category.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "category",
 			"resource_id":   category.ID,
@@ -234,7 +332,10 @@ func (h *CategoryHandler) Delete(c *gin.Context) {
 
 	// Delete category (CASCADE: all related projects will be deleted)
 	if err := h.repo.Delete(uint(id)); err != nil {
-		logrus.WithFields(logrus.Fields{
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "DELETE_CATEGORY_DB_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "Delete",
 			"categoryID":  id,
 			"userID":      userID,
 			"portfolioID": category.PortfolioID,
@@ -263,6 +364,13 @@ func (h *CategoryHandler) GetByIDPublic(c *gin.Context) {
 	// Parse category ID
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_CATEGORY_BY_ID_PUBLIC_INVALID_ID",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "GetByIDPublic",
+			"categoryID": categoryID,
+			"error":      err.Error(),
+		}).Warn("Invalid category ID")
 		response.BadRequest(c, "Invalid category ID")
 		return
 	}
@@ -270,6 +378,13 @@ func (h *CategoryHandler) GetByIDPublic(c *gin.Context) {
 	// Get complete category with relationships
 	category, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_CATEGORY_BY_ID_PUBLIC_NOT_FOUND",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "GetByIDPublic",
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Category not found")
 		response.NotFound(c, "Category not found")
 		return
 	}
@@ -283,6 +398,13 @@ func (h *CategoryHandler) GetByPortfolio(c *gin.Context) {
 	// Get categories for this portfolio
 	categories, err := h.repo.GetByPortfolioID(portfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_CATEGORIES_BY_PORTFOLIO_DB_ERROR",
+			"where":       "backend/internal/application/handler/category.go",
+			"function":    "GetByPortfolio",
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+		}).Error("Failed to retrieve categories")
 		response.InternalError(c, "Failed to retrieve categories")
 		return
 	}
@@ -298,6 +420,14 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 	// Parse category ID
 	id, err := strconv.Atoi(categoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_POSITION_INVALID_ID",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "UpdatePosition",
+			"userID":     userID,
+			"categoryID": categoryID,
+			"error":      err.Error(),
+		}).Warn("Invalid category ID")
 		response.BadRequest(c, "Invalid category ID")
 		return
 	}
@@ -307,6 +437,14 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 		Position uint `json:"position" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_POSITION_BAD_REQUEST",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "UpdatePosition",
+			"userID":     userID,
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -314,11 +452,27 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 	// Check if category exists and belongs to user
 	existing, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_POSITION_NOT_FOUND",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "UpdatePosition",
+			"userID":     userID,
+			"categoryID": id,
+			"error":      err.Error(),
+		}).Warn("Category not found")
 		response.NotFound(c, "Category not found")
 		return
 	}
 
 	if existing.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_POSITION_FORBIDDEN",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "UpdatePosition",
+			"userID":     userID,
+			"categoryID": id,
+			"ownerID":    existing.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "category",
 			"resource_id":   existing.ID,
@@ -330,6 +484,15 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 
 	// Update position
 	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_CATEGORY_POSITION_DB_ERROR",
+			"where":      "backend/internal/application/handler/category.go",
+			"function":   "UpdatePosition",
+			"userID":     userID,
+			"categoryID": id,
+			"position":   req.Position,
+			"error":      err.Error(),
+		}).Error("Failed to update category position")
 		response.InternalError(c, "Failed to update category position")
 		return
 	}

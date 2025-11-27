@@ -277,7 +277,7 @@ func logClientError(c *gin.Context, status int, errorMsg, file string, line int,
 
 	// Automatically log all 400 errors to audit log
 	if status == 400 {
-		auditLogger := audit.GetBadRequestLogger()
+		auditLogger := audit.GetErrorLogger()
 		auditFields := logrus.Fields{
 			"operation":  "BAD_REQUEST",
 			"method":     c.Request.Method,
