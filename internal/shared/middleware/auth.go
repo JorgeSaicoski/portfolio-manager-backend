@@ -9,10 +9,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 var (

@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 // RateLimiter manages rate limiting per IP address

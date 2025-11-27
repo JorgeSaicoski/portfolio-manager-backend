@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
-	"portfolio-manager/backend/internal/infrastructure/audit"
 )
 
 // SecurityHeaders adds security-related HTTP headers to all responses
