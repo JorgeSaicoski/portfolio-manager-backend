@@ -14,8 +14,8 @@ const (
 	// MinCompressionSize is the minimum response size to trigger compression (1KB)
 	MinCompressionSize = 1024
 	// DefaultCompressionLevel is the default gzip compression level
-	DefaultCompressionLevel
-
+	DefaultCompressionLevel = gzip.DefaultCompression
+)
 
 var gzipWriterPool = sync.Pool{
 	New: func() interface{} {
