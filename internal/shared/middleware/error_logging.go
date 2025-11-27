@@ -84,7 +84,10 @@ func extractActualErrorLocation(stackTrace string) (string, int, string) {
 
 			// Parse line number
 			var lineNum int
-			fmt.Sscanf(lineStr, "%d", &lineNum)
+			_, err := fmt.Sscanf(lineStr, "%d", &lineNum)
+			if err != nil {
+				return "", 0, ""
+			}
 
 			// Extract just the handler name from function
 			handlerName := extractHandlerName(lastFunction)
@@ -98,7 +101,10 @@ func extractActualErrorLocation(stackTrace string) (string, int, string) {
 				file := matches[1]
 				lineStr := matches[2]
 				var lineNum int
-				fmt.Sscanf(lineStr, "%d", &lineNum)
+				_, err := fmt.Sscanf(lineStr, "%d", &lineNum)
+				if err != nil {
+					return "", 0, ""
+				}
 				handlerName := extractHandlerName(lastFunction)
 				return file, lineNum, handlerName
 			}
@@ -112,7 +118,10 @@ func extractActualErrorLocation(stackTrace string) (string, int, string) {
 			file := matches[1]
 			lineStr := matches[2]
 			var lineNum int
-			fmt.Sscanf(lineStr, "%d", &lineNum)
+			_, err := fmt.Sscanf(lineStr, "%d", &lineNum)
+			if err != nil {
+				return "", 0, ""
+			}
 			return file, lineNum, "unknown"
 		}
 	}

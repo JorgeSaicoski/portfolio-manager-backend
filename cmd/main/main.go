@@ -82,9 +82,9 @@ func setupLogger() *logrus.Logger {
 		// Setup main audit log with rotation (errors and important events only)
 		logFile := &lumberjack.Logger{
 			Filename:   filepath.Join(auditDir, "audit.log"),
-			MaxSize:    10, // megabytes
-			MaxBackups: 30, // keep 30 old log files
-			MaxAge:     90, // days
+			MaxSize:    100, // megabytes
+			MaxBackups: 30,  // keep 30 old log files
+			MaxAge:     90,  // days
 			Compress:   true,
 		}
 
