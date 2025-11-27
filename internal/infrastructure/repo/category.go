@@ -77,6 +77,32 @@ func (r *categoryRepository) UpdatePosition(id uint, position uint) error {
 	return r.db.Model(&models.Category{}).Where("id = ?", id).Update("position", position).Error
 }
 
+// GetByIDs fetches multiple categories by their IDs
+func (r *categoryRepository) GetByIDs(ids []uint) ([]*models.Category, error) {
+	var categories []*models.Category
+	if err := r.db.Where("id IN ?", ids).Find(&categories).Error; err != nil {
+		return nil, err
+	}
+	return categories, nil
+}
+
+// BulkUpdatePositions updates positions for multiple categories in a transaction
+func (r *categoryRepository) BulkUpdatePositions(items []struct {
+	ID       uint
+	Position uint
+}) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, item := range items {
+			if err := tx.Model(&models.Category{}).
+				Where("id = ?", item.ID).
+				Update("position", item.Position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *categoryRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Category{}, id).Error
 }

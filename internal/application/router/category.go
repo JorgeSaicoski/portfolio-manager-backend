@@ -17,6 +17,7 @@ func (r *Router) RegisterCategoryRoutes(apiGroup *gin.RouterGroup) {
 		protected.GET("/:id", r.categoryHandler.GetByIDPublic) // Authenticated users can also view
 		protected.PUT("/:id", r.categoryHandler.Update)
 		protected.PUT("/:id/position", r.categoryHandler.UpdatePosition)
+		protected.PUT("/reorder", r.categoryHandler.BulkReorder)
 		protected.DELETE("/:id", r.categoryHandler.Delete)
 	}
 

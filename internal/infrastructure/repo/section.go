@@ -111,6 +111,32 @@ func (r *sectionRepository) UpdatePosition(id uint, position uint) error {
 	return r.db.Model(&models.Section{}).Where("id = ?", id).Update("position", position).Error
 }
 
+// GetByIDs fetches multiple sections by their IDs
+func (r *sectionRepository) GetByIDs(ids []uint) ([]*models.Section, error) {
+	var sections []*models.Section
+	if err := r.db.Where("id IN ?", ids).Find(&sections).Error; err != nil {
+		return nil, err
+	}
+	return sections, nil
+}
+
+// BulkUpdatePositions updates positions for multiple sections in a transaction
+func (r *sectionRepository) BulkUpdatePositions(items []struct {
+	ID       uint
+	Position uint
+}) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, item := range items {
+			if err := tx.Model(&models.Section{}).
+				Where("id = ?", item.ID).
+				Update("position", item.Position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *sectionRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Section{}, id).Error
 }
