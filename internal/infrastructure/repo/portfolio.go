@@ -40,6 +40,15 @@ func (r *portfolioRepository) GetByIDWithRelations(id uint) (*models.Portfolio, 
 	return &portfolio, err
 }
 
+func (r *portfolioRepository) GetByID(id uint) (*models.Portfolio, error) {
+	var portfolio models.Portfolio
+	err := r.db.First(&portfolio, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &portfolio, nil
+}
+
 func (r *portfolioRepository) GetByIDBasic(id uint) (*models.Portfolio, error) {
 	var portfolio models.Portfolio
 	err := r.db.Select("id, owner_id").First(&portfolio, id).Error
