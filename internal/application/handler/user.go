@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/repo"
 	"github.com/gin-gonic/gin"
 	"github.com/sirupsen/logrus"
@@ -39,6 +40,11 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	userID := c.GetString("userID")
 
 	if userID == "" {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CLEANUP_USER_DATA_MISSING_USER_ID",
+			"where":     "backend/internal/application/handler/user.go",
+			"function":  "CleanupUserData",
+		}).Warn("User ID is required")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "User ID is required",
 		})
@@ -52,9 +58,12 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	// Get all portfolios for this user
 	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"userID": userID,
-			"error":  err.Error(),
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CLEANUP_USER_DATA_DB_ERROR",
+			"where":     "backend/internal/application/handler/user.go",
+			"function":  "CleanupUserData",
+			"userID":    userID,
+			"error":     err.Error(),
 		}).Error("Failed to retrieve user portfolios for cleanup")
 
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -68,7 +77,10 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	// Delete all portfolios (CASCADE will delete all related data)
 	for _, portfolio := range portfolios {
 		if err := h.portfolioRepo.Delete(portfolio.ID); err != nil {
-			logrus.WithFields(logrus.Fields{
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation":   "CLEANUP_USER_DATA_DELETE_ERROR",
+				"where":       "backend/internal/application/handler/user.go",
+				"function":    "CleanupUserData",
 				"userID":      userID,
 				"portfolioID": portfolio.ID,
 				"error":       err.Error(),
@@ -104,6 +116,11 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	userID := c.GetString("userID")
 
 	if userID == "" {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_USER_DATA_SUMMARY_MISSING_USER_ID",
+			"where":     "backend/internal/application/handler/user.go",
+			"function":  "GetUserDataSummary",
+		}).Warn("User ID is required")
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "User ID is required",
 		})
@@ -113,6 +130,13 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	// Get all portfolios for this user
 	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_USER_DATA_SUMMARY_DB_ERROR",
+			"where":     "backend/internal/application/handler/user.go",
+			"function":  "GetUserDataSummary",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve user data")
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to retrieve user data",
 		})

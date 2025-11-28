@@ -51,6 +51,13 @@ func (h *ProjectHandler) GetByUser(c *gin.Context) {
 
 	projects, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECTS_BY_USER_DB_ERROR",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByUser",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve projects")
 		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
@@ -67,6 +74,13 @@ func (h *ProjectHandler) GetByCategory(c *gin.Context) {
 
 	projects, err := h.repo.GetByCategoryID(categoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_PROJECTS_BY_CATEGORY_DB_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "GetByCategory",
+			"categoryID": categoryID,
+			"error":      err.Error(),
+		}).Error("Failed to retrieve projects")
 		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
@@ -80,12 +94,26 @@ func (h *ProjectHandler) GetByID(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECT_BY_ID_INVALID_ID",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByID",
+			"projectID": projectID,
+			"error":     err.Error(),
+		}).Warn("Invalid project ID")
 		response.BadRequest(c, "Invalid project ID")
 		return
 	}
 
 	project, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECT_BY_ID_NOT_FOUND",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByID",
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Project not found")
 		response.NotFound(c, "Project not found")
 		return
 	}
@@ -99,6 +127,13 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Parse request body
 	var newProject models.Project
 	if err := c.ShouldBindJSON(&newProject); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PROJECT_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Create",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -108,6 +143,14 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 
 	// Validate project data first (includes categoryID check)
 	if err := validator.ValidateProject(&newProject); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "CREATE_PROJECT_VALIDATION_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Create",
+			"userID":     userID,
+			"categoryID": newProject.CategoryID,
+			"error":      err.Error(),
+		}).Warn("Project validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -115,17 +158,43 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Validate category exists and belongs to user's portfolio
 	category, err := h.categoryRepo.GetByID(newProject.CategoryID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "CREATE_PROJECT_CATEGORY_NOT_FOUND",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Create",
+			"userID":     userID,
+			"categoryID": newProject.CategoryID,
+			"error":      err.Error(),
+		}).Warn("Category not found")
 		response.NotFound(c, "Category not found")
 		return
 	}
 
 	portfolio, err := h.portfolioRepo.GetByIDBasic(category.PortfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_PROJECT_PORTFOLIO_NOT_FOUND",
+			"where":       "backend/internal/application/handler/project.go",
+			"function":    "Create",
+			"userID":      userID,
+			"categoryID":  newProject.CategoryID,
+			"portfolioID": category.PortfolioID,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		response.NotFound(c, "Portfolio not found")
 		return
 	}
 
 	if portfolio.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "CREATE_PROJECT_FORBIDDEN",
+			"where":       "backend/internal/application/handler/project.go",
+			"function":    "Create",
+			"userID":      userID,
+			"categoryID":  newProject.CategoryID,
+			"portfolioID": category.PortfolioID,
+			"ownerID":     portfolio.OwnerID,
+		}).Warn("Access denied: category belongs to another user's portfolio")
 		response.ForbiddenWithDetails(c, "Access denied: category belongs to another user's portfolio", map[string]interface{}{
 			"resource_type": "category",
 			"resource_id":   category.ID,
@@ -138,10 +207,27 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(newProject.Title, newProject.CategoryID, 0)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "CREATE_PROJECT_DUPLICATE_CHECK_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Create",
+			"userID":     userID,
+			"categoryID": newProject.CategoryID,
+			"title":      newProject.Title,
+			"error":      err.Error(),
+		}).Error("Failed to check for duplicate project")
 		response.InternalError(c, "Failed to check for duplicate project")
 		return
 	}
 	if isDuplicate {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "CREATE_PROJECT_DUPLICATE_TITLE",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Create",
+			"userID":     userID,
+			"categoryID": newProject.CategoryID,
+			"title":      newProject.Title,
+		}).Warn("Project with this title already exists in this category")
 		response.BadRequest(c, "Project with this title already exists in this category")
 		return
 	}
@@ -151,9 +237,25 @@ func (h *ProjectHandler) Create(c *gin.Context) {
 		// Check if error is due to foreign key constraint (invalid category_id)
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "fk_categories_projects") || strings.Contains(errMsg, "23503") {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation":  "CREATE_PROJECT_FK_CONSTRAINT_ERROR",
+				"where":      "backend/internal/application/handler/project.go",
+				"function":   "Create",
+				"userID":     userID,
+				"categoryID": newProject.CategoryID,
+				"error":      err.Error(),
+			}).Warn("Category not found during project creation")
 			response.NotFound(c, "Category not found")
 			return
 		}
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "CREATE_PROJECT_DB_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Create",
+			"userID":     userID,
+			"categoryID": newProject.CategoryID,
+			"error":      err.Error(),
+		}).Error("Failed to create project")
 		response.InternalError(c, "Failed to create project")
 		return
 	}
@@ -168,6 +270,14 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_INVALID_ID",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Update",
+			"userID":    userID,
+			"projectID": projectID,
+			"error":     err.Error(),
+		}).Warn("Invalid project ID")
 		response.BadRequest(c, "Invalid project ID")
 		return
 	}
@@ -175,6 +285,14 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Parse request body
 	var updateData models.Project
 	if err := c.ShouldBindJSON(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Update",
+			"userID":    userID,
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -185,6 +303,15 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 
 	// Validate project data
 	if err := validator.ValidateProject(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_PROJECT_VALIDATION_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Update",
+			"userID":     userID,
+			"projectID":  id,
+			"categoryID": updateData.CategoryID,
+			"error":      err.Error(),
+		}).Warn("Project validation failed")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -192,10 +319,26 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Check if project exists and belongs to user
 	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_NOT_FOUND",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Update",
+			"userID":    userID,
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Project not found")
 		response.NotFound(c, "Project not found")
 		return
 	}
 	if existing.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_FORBIDDEN",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Update",
+			"userID":    userID,
+			"projectID": id,
+			"ownerID":   existing.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "project",
 			"resource_id":   existing.ID,
@@ -208,10 +351,29 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.CategoryID, updateData.ID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_PROJECT_DUPLICATE_CHECK_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Update",
+			"userID":     userID,
+			"projectID":  id,
+			"categoryID": updateData.CategoryID,
+			"title":      updateData.Title,
+			"error":      err.Error(),
+		}).Error("Failed to check for duplicate project")
 		response.InternalError(c, "Failed to check for duplicate project")
 		return
 	}
 	if isDuplicate {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_PROJECT_DUPLICATE_TITLE",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Update",
+			"userID":     userID,
+			"projectID":  id,
+			"categoryID": updateData.CategoryID,
+			"title":      updateData.Title,
+		}).Warn("Project with this title already exists in this category")
 		response.BadRequest(c, "Project with this title already exists in this category")
 		return
 	}
@@ -221,9 +383,27 @@ func (h *ProjectHandler) Update(c *gin.Context) {
 		// Check if error is due to foreign key constraint (invalid category_id)
 		errMsg := err.Error()
 		if strings.Contains(errMsg, "fk_categories_projects") || strings.Contains(errMsg, "23503") {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation":  "UPDATE_PROJECT_FK_CONSTRAINT_ERROR",
+				"where":      "backend/internal/application/handler/project.go",
+				"function":   "Update",
+				"userID":     userID,
+				"projectID":  id,
+				"categoryID": updateData.CategoryID,
+				"error":      err.Error(),
+			}).Warn("Category not found")
 			response.NotFound(c, "Category not found")
 			return
 		}
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_PROJECT_DB_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Update",
+			"userID":     userID,
+			"projectID":  id,
+			"categoryID": updateData.CategoryID,
+			"error":      err.Error(),
+		}).Error("Failed to update project")
 		response.InternalError(c, "Failed to update project")
 		return
 	}
@@ -237,6 +417,14 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_PROJECT_INVALID_ID",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"projectID": projectID,
+			"error":     err.Error(),
+		}).Warn("Invalid project ID")
 		response.BadRequest(c, "Invalid project ID")
 		return
 	}
@@ -244,11 +432,27 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	// Get a project to check ownership
 	project, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_PROJECT_NOT_FOUND",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Project not found")
 		response.NotFound(c, "Project not found")
 		return
 	}
 
 	if project.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_PROJECT_FORBIDDEN",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "Delete",
+			"userID":    userID,
+			"projectID": id,
+			"ownerID":   project.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "project",
 			"resource_id":   project.ID,
@@ -259,7 +463,10 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		logrus.WithFields(logrus.Fields{
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_PROJECT_DB_ERROR",
+			"where":      "backend/internal/application/handler/project.go",
+			"function":   "Delete",
 			"projectID":  id,
 			"userID":     userID,
 			"categoryID": project.CategoryID,
@@ -284,12 +491,24 @@ func (h *ProjectHandler) Delete(c *gin.Context) {
 func (h *ProjectHandler) GetBySkills(c *gin.Context) {
 	skills := c.QueryArray("skills")
 	if len(skills) == 0 {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECTS_BY_SKILLS_MISSING_SKILLS",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetBySkills",
+		}).Warn("At least one skill is required")
 		response.BadRequest(c, "At least one skill is required")
 		return
 	}
 
 	projects, err := h.repo.GetBySkills(skills)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECTS_BY_SKILLS_DB_ERROR",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetBySkills",
+			"skills":    skills,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve projects")
 		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
@@ -300,12 +519,24 @@ func (h *ProjectHandler) GetBySkills(c *gin.Context) {
 func (h *ProjectHandler) GetByClient(c *gin.Context) {
 	client := c.Query("client")
 	if client == "" {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECTS_BY_CLIENT_MISSING_CLIENT",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByClient",
+		}).Warn("Client name is required")
 		response.BadRequest(c, "Client name is required")
 		return
 	}
 
 	projects, err := h.repo.GetByClient(client)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECTS_BY_CLIENT_DB_ERROR",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByClient",
+			"client":    client,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve projects")
 		response.InternalError(c, "Failed to retrieve projects")
 		return
 	}
@@ -319,12 +550,26 @@ func (h *ProjectHandler) GetByIDPublic(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECT_BY_ID_PUBLIC_INVALID_ID",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByIDPublic",
+			"projectID": projectID,
+			"error":     err.Error(),
+		}).Warn("Invalid project ID")
 		response.BadRequest(c, "Invalid project ID")
 		return
 	}
 
 	project, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PROJECT_BY_ID_PUBLIC_NOT_FOUND",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "GetByIDPublic",
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Project not found")
 		response.NotFound(c, "Project not found")
 		return
 	}
@@ -340,6 +585,14 @@ func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
 	// Parse project ID
 	id, err := strconv.Atoi(projectID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_POSITION_INVALID_ID",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "UpdatePosition",
+			"userID":    userID,
+			"projectID": projectID,
+			"error":     err.Error(),
+		}).Warn("Invalid project ID")
 		response.BadRequest(c, "Invalid project ID")
 		return
 	}
@@ -349,6 +602,14 @@ func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
 		Position uint `json:"position" binding:"required"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_POSITION_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "UpdatePosition",
+			"userID":    userID,
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, "Invalid request data")
 		return
 	}
@@ -356,11 +617,27 @@ func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
 	// Check if project exists and belongs to user
 	existing, err := h.repo.GetByID(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_POSITION_NOT_FOUND",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "UpdatePosition",
+			"userID":    userID,
+			"projectID": id,
+			"error":     err.Error(),
+		}).Warn("Project not found")
 		response.NotFound(c, "Project not found")
 		return
 	}
 
 	if existing.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_POSITION_FORBIDDEN",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "UpdatePosition",
+			"userID":    userID,
+			"projectID": id,
+			"ownerID":   existing.OwnerID,
+		}).Warn("Access denied")
 		response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
 			"resource_type": "project",
 			"resource_id":   existing.ID,
@@ -372,6 +649,15 @@ func (h *ProjectHandler) UpdatePosition(c *gin.Context) {
 
 	// Update position
 	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_PROJECT_POSITION_DB_ERROR",
+			"where":     "backend/internal/application/handler/project.go",
+			"function":  "UpdatePosition",
+			"userID":    userID,
+			"projectID": id,
+			"position":  req.Position,
+			"error":     err.Error(),
+		}).Error("Failed to update project position")
 		response.InternalError(c, "Failed to update project position")
 		return
 	}

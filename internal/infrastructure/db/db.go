@@ -125,6 +125,17 @@ func (d *Database) Migrate() error {
 		return fmt.Errorf("failed to create project position trigger: %w", err)
 	}
 
+	// Create trigger for automatic section position assignment
+	if err := CreateSectionPositionTrigger(d.DB); err != nil {
+		return fmt.Errorf("failed to create section position trigger: %w", err)
+	}
+
+	// Backfill existing section positions
+	if err := BackfillSectionPositions(d.DB); err != nil {
+		log.Printf("Warning: section position backfill failed: %v", err)
+		// Don't return error - non-critical for new installations
+	}
+
 	// Drop the redundant category_count column from portfolios
 	if err := DropCategoryCountColumn(d.DB); err != nil {
 		return fmt.Errorf("failed to drop category_count column: %w", err)

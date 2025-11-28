@@ -178,14 +178,9 @@ func (s *Server) readinessHandler(c *gin.Context) {
 
 func (s *Server) loggingMiddleware() gin.HandlerFunc {
 	return gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
-		s.logger.WithFields(logrus.Fields{
-			"status":     param.StatusCode,
-			"method":     param.Method,
-			"path":       param.Path,
-			"ip":         param.ClientIP,
-			"latency":    param.Latency,
-			"user_agent": param.Request.UserAgent(),
-		}).Info("HTTP Request")
+		// Don't log successful requests to audit.log - only log errors
+		// Error logging is handled by error_logging.go middleware
+		// This prevents audit.log from filling up with GET requests
 		return ""
 	})
 }

@@ -43,6 +43,13 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 
 	portfolios, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_PORTFOLIOS_BY_USER_DB_ERROR",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "GetByUser",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to retrieve portfolios")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error: "Failed to retrieve portfolios",
 		})
@@ -63,6 +70,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	// Parse portfolio ID
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_INVALID_ID",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+		}).Warn("Invalid portfolio ID")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid portfolio ID",
 		})
@@ -72,6 +87,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	// Parse request body
 	var req request.UpdatePortfolioRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_BAD_REQUEST",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Warn("Invalid request data")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request data",
 		})
@@ -88,6 +111,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 
 	// Validate portfolio data
 	if err := validator.ValidatePortfolio(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_VALIDATION_ERROR",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Warn("Portfolio validation failed")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: err.Error(),
 		})
@@ -97,12 +128,28 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	// Check if portfolio exists and belongs to user
 	existing, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_NOT_FOUND",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{
 			Error: "Portfolio not found",
 		})
 		return
 	}
 	if existing.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_FORBIDDEN",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"ownerID":     existing.OwnerID,
+		}).Warn("Access denied")
 		c.JSON(http.StatusForbidden, dto.ErrorResponse{
 			Error: "Access denied",
 		})
@@ -112,12 +159,29 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(updateData.Title, updateData.OwnerID, updateData.ID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_DUPLICATE_CHECK_ERROR",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"title":       updateData.Title,
+			"error":       err.Error(),
+		}).Error("Failed to check for duplicate portfolio")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error: "Failed to check for duplicate portfolio",
 		})
 		return
 	}
 	if isDuplicate {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_DUPLICATE_TITLE",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"title":       updateData.Title,
+		}).Warn("Portfolio with this title already exists")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Portfolio with this title already exists",
 		})
@@ -126,6 +190,14 @@ func (h *PortfolioHandler) Update(c *gin.Context) {
 
 	// Update portfolio
 	if err := h.repo.Update(&updateData); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "UPDATE_PORTFOLIO_DB_ERROR",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Update",
+			"userID":      userID,
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Error("Failed to update portfolio")
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
 			Error: "Failed to update portfolio",
 		})
@@ -159,11 +231,14 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Log the raw request body for debugging
 		bodyBytes, _ := c.GetRawData()
-		logrus.WithFields(logrus.Fields{
-			"error":    err.Error(),
-			"raw_body": string(bodyBytes),
-			"userID":   userID,
-		}).Error("Failed to parse portfolio creation request")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PORTFOLIO_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "Create",
+			"error":     err.Error(),
+			"raw_body":  string(bodyBytes),
+			"userID":    userID,
+		}).Warn("Failed to parse portfolio creation request")
 
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid request data: " + err.Error(),
@@ -193,11 +268,14 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 
 	// Validate portfolio data
 	if err := validator.ValidatePortfolio(&newPortfolio); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"error":  err.Error(),
-			"userID": userID,
-			"title":  newPortfolio.Title,
-		}).Error("Portfolio validation failed")
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PORTFOLIO_VALIDATION_ERROR",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "Create",
+			"error":     err.Error(),
+			"userID":    userID,
+			"title":     newPortfolio.Title,
+		}).Warn("Portfolio validation failed")
 
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: err.Error(),
@@ -210,10 +288,13 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 	// Check for duplicate title
 	isDuplicate, err := h.repo.CheckDuplicate(newPortfolio.Title, newPortfolio.OwnerID, 0)
 	if err != nil {
-		logrus.WithFields(logrus.Fields{
-			"error":  err.Error(),
-			"userID": userID,
-			"title":  newPortfolio.Title,
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PORTFOLIO_DUPLICATE_CHECK_ERROR",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "Create",
+			"error":     err.Error(),
+			"userID":    userID,
+			"title":     newPortfolio.Title,
 		}).Error("Failed to check for duplicate portfolio")
 
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -222,9 +303,12 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 		return
 	}
 	if isDuplicate {
-		logrus.WithFields(logrus.Fields{
-			"userID": userID,
-			"title":  newPortfolio.Title,
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PORTFOLIO_DUPLICATE_TITLE",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "Create",
+			"userID":    userID,
+			"title":     newPortfolio.Title,
 		}).Warn("Duplicate portfolio title detected")
 
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
@@ -237,10 +321,13 @@ func (h *PortfolioHandler) Create(c *gin.Context) {
 
 	// Create portfolio
 	if err := h.repo.Create(&newPortfolio); err != nil {
-		logrus.WithFields(logrus.Fields{
-			"error":  err.Error(),
-			"userID": userID,
-			"title":  newPortfolio.Title,
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_PORTFOLIO_DB_ERROR",
+			"where":     "backend/internal/application/handler/portfolio.go",
+			"function":  "Create",
+			"error":     err.Error(),
+			"userID":    userID,
+			"title":     newPortfolio.Title,
 		}).Error("Failed to create portfolio in database")
 
 		c.JSON(http.StatusInternalServerError, dto.ErrorResponse{
@@ -269,6 +356,14 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "DELETE_PORTFOLIO_INVALID_ID",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Delete",
+			"userID":      userID,
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+		}).Warn("Invalid portfolio ID")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid portfolio ID",
 		})
@@ -278,6 +373,14 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 	// Use basic method - only fetch id and owner_id for authorization
 	portfolio, err := h.repo.GetByIDBasic(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "DELETE_PORTFOLIO_NOT_FOUND",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Delete",
+			"userID":      userID,
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{
 			Error: "Portfolio not found",
 		})
@@ -285,6 +388,14 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 	}
 
 	if portfolio.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "DELETE_PORTFOLIO_FORBIDDEN",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Delete",
+			"userID":      userID,
+			"portfolioID": id,
+			"ownerID":     portfolio.OwnerID,
+		}).Warn("Access denied")
 		c.JSON(http.StatusForbidden, dto.ErrorResponse{
 			Error: "Access denied",
 		})
@@ -292,7 +403,10 @@ func (h *PortfolioHandler) Delete(c *gin.Context) {
 	}
 
 	if err := h.repo.Delete(uint(id)); err != nil {
-		logrus.WithFields(logrus.Fields{
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "DELETE_PORTFOLIO_DB_ERROR",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "Delete",
 			"portfolioID": id,
 			"userID":      userID,
 			"error":       err.Error(),
@@ -324,6 +438,13 @@ func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 	// Parse portfolio ID
 	id, err := strconv.Atoi(portfolioID)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_PORTFOLIO_BY_ID_PUBLIC_INVALID_ID",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "GetByIDPublic",
+			"portfolioID": portfolioID,
+			"error":       err.Error(),
+		}).Warn("Invalid portfolio ID")
 		c.JSON(http.StatusBadRequest, dto.ErrorResponse{
 			Error: "Invalid portfolio ID",
 		})
@@ -333,6 +454,13 @@ func (h *PortfolioHandler) GetByIDPublic(c *gin.Context) {
 	// Get complete portfolio with relationships
 	portfolio, err := h.repo.GetByIDWithRelations(uint(id))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_PORTFOLIO_BY_ID_PUBLIC_NOT_FOUND",
+			"where":       "backend/internal/application/handler/portfolio.go",
+			"function":    "GetByIDPublic",
+			"portfolioID": id,
+			"error":       err.Error(),
+		}).Warn("Portfolio not found")
 		c.JSON(http.StatusNotFound, dto.ErrorResponse{
 			Error: "Portfolio not found",
 		})

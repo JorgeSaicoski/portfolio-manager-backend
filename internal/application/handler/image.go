@@ -34,6 +34,13 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 
 	// Parse multipart form
 	if err := c.Request.ParseMultipartForm(MaxFileSize); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPLOAD_IMAGE_PARSE_FORM_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("Failed to parse form data")
 		response.BadRequest(c, "Failed to parse form data")
 		return
 	}
@@ -41,20 +48,54 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	// Get the file from the request
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPLOAD_IMAGE_NO_FILE_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("No file uploaded")
 		response.BadRequest(c, "No file uploaded")
 		return
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "UPLOAD_IMAGE_FILE_CLOSE_ERROR",
+				"where":     "backend/internal/application/handler/image.go",
+				"function":  "UploadImage",
+				"userID":    userID,
+				"filename":  header.Filename,
+				"error":     err.Error(),
+			}).Error("Failed to close uploaded file")
+		}
+	}()
 
 	// Parse form data
 	var req dto.CreateImageRequest
 	if err := c.ShouldBind(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "CREATE_IMAGE_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"data":      req,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, err.Error())
 		return
 	}
 
 	// Validate the image
 	if err := ValidateImage(file, header); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPLOAD_IMAGE_VALIDATION_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"filename":  header.Filename,
+			"error":     err.Error(),
+		}).Warn("Invalid image file")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -65,6 +106,14 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 	// Save the image (optimized original + thumbnail)
 	originalURL, thumbnailURL, err := SaveImage(file, filename)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPLOAD_IMAGE_SAVE_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"filename":  filename,
+			"error":     err.Error(),
+		}).Error("Failed to save image")
 		response.InternalError(c, fmt.Sprintf("Failed to save image: %v", err))
 		return
 	}
@@ -86,7 +135,24 @@ func (h *ImageHandler) UploadImage(c *gin.Context) {
 
 	if err := h.repo.Create(image); err != nil {
 		// Clean up files if database creation fails
-		DeleteImageFiles(originalURL, thumbnailURL)
+		if delErr := DeleteImageFiles(originalURL, thumbnailURL); delErr != nil {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "UPLOAD_IMAGE_FILE_DELETE_ERROR",
+				"where":     "backend/internal/application/handler/image.go",
+				"function":  "UploadImage",
+				"userID":    userID,
+				"filename":  filename,
+				"error":     delErr.Error(),
+			}).Error("Failed to delete image files after DB error")
+		}
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPLOAD_IMAGE_DB_CREATE_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UploadImage",
+			"userID":    userID,
+			"filename":  filename,
+			"error":     err.Error(),
+		}).Error("Failed to create image record")
 		response.InternalError(c, "Failed to create image record")
 		return
 	}
@@ -118,18 +184,40 @@ func (h *ImageHandler) GetImages(c *gin.Context) {
 
 	// Validate query parameters
 	if entityType == "" || entityIDStr == "" {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_IMAGES_MISSING_PARAMS",
+			"where":       "backend/internal/application/handler/image.go",
+			"function":    "GetImages",
+			"entityType":  entityType,
+			"entityIDStr": entityIDStr,
+		}).Warn("Missing required query parameters")
 		response.BadRequest(c, "entity_type and entity_id are required")
 		return
 	}
 
 	entityID, err := strconv.Atoi(entityIDStr)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_IMAGES_INVALID_ID",
+			"where":       "backend/internal/application/handler/image.go",
+			"function":    "GetImages",
+			"entityIDStr": entityIDStr,
+			"error":       err.Error(),
+		}).Warn("Invalid entity_id")
 		response.BadRequest(c, "Invalid entity_id")
 		return
 	}
 
 	images, err := h.repo.GetByEntity(entityType, uint(entityID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_IMAGES_DB_ERROR",
+			"where":      "backend/internal/application/handler/image.go",
+			"function":   "GetImages",
+			"entityType": entityType,
+			"entityID":   entityID,
+			"error":      err.Error(),
+		}).Error("Failed to retrieve images from database")
 		response.InternalError(c, "Failed to retrieve images")
 		return
 	}
@@ -144,18 +232,38 @@ func (h *ImageHandler) GetImagesByEntity(c *gin.Context) {
 
 	// Validate path parameters
 	if entityType == "" {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_IMAGES_BY_ENTITY_MISSING_TYPE",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "GetImagesByEntity",
+		}).Warn("Missing entity_type parameter")
 		response.BadRequest(c, "entity_type is required")
 		return
 	}
 
 	entityID, err := strconv.Atoi(entityIDStr)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":   "GET_IMAGES_BY_ENTITY_INVALID_ID",
+			"where":       "backend/internal/application/handler/image.go",
+			"function":    "GetImagesByEntity",
+			"entityIDStr": entityIDStr,
+			"error":       err.Error(),
+		}).Warn("Invalid entity_id")
 		response.BadRequest(c, "Invalid entity_id")
 		return
 	}
 
 	images, err := h.repo.GetByEntity(entityType, uint(entityID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_IMAGES_BY_ENTITY_DB_ERROR",
+			"where":      "backend/internal/application/handler/image.go",
+			"function":   "GetImagesByEntity",
+			"entityType": entityType,
+			"entityID":   entityID,
+			"error":      err.Error(),
+		}).Error("Failed to retrieve images from database")
 		response.InternalError(c, "Failed to retrieve images")
 		return
 	}
@@ -169,12 +277,26 @@ func (h *ImageHandler) GetImageByID(c *gin.Context) {
 
 	imageID, err := strconv.Atoi(imageIDStr)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "GET_IMAGE_BY_ID_INVALID_ID",
+			"where":      "backend/internal/application/handler/image.go",
+			"function":   "GetImageByID",
+			"imageIDStr": imageIDStr,
+			"error":      err.Error(),
+		}).Warn("Invalid image ID")
 		response.BadRequest(c, "Invalid image ID")
 		return
 	}
 
 	image, err := h.repo.GetByID(uint(imageID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "GET_IMAGE_BY_ID_NOT_FOUND",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "GetImageByID",
+			"imageID":   imageID,
+			"error":     err.Error(),
+		}).Warn("Image not found")
 		response.NotFound(c, "Image not found")
 		return
 	}
@@ -189,6 +311,13 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 
 	imageID, err := strconv.Atoi(imageIDStr)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "UPDATE_IMAGE_INVALID_ID",
+			"where":      "backend/internal/application/handler/image.go",
+			"function":   "UpdateImage",
+			"imageIDStr": imageIDStr,
+			"error":      err.Error(),
+		}).Warn("Invalid image ID")
 		response.BadRequest(c, "Invalid image ID")
 		return
 	}
@@ -197,11 +326,26 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 	// Get image to check ownership and get details
 	image, err := h.repo.GetByID(uint(imageID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_IMAGE_NOT_FOUND",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UpdateImage",
+			"imageID":   imageID,
+			"error":     err.Error(),
+		}).Warn("Image not found")
 		response.NotFound(c, "Image not found")
 		return
 	}
 
 	if image.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_IMAGE_FORBIDDEN",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UpdateImage",
+			"imageID":   imageID,
+			"ownerID":   image.OwnerID,
+			"userID":    userID,
+		}).Warn("Permission denied to update image")
 		response.ForbiddenWithDetails(c, "You don't have permission to update this image", map[string]interface{}{
 			"resource_type": "image",
 			"resource_id":   image.ID,
@@ -216,6 +360,15 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 	// Parse request body
 	var req dto.UpdateImageRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_IMAGE_BAD_REQUEST",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UpdateImage",
+			"imageID":   imageID,
+			"userID":    userID,
+			"data":      req,
+			"error":     err.Error(),
+		}).Warn("Invalid request data")
 		response.BadRequest(c, err.Error())
 		return
 	}
@@ -223,6 +376,13 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 	// Get existing image
 	image, err = h.repo.GetByID(uint(imageID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_IMAGE_NOT_FOUND_AGAIN",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UpdateImage",
+			"imageID":   imageID,
+			"error":     err.Error(),
+		}).Warn("Image not found (second check)")
 		response.NotFound(c, "Image not found")
 		return
 	}
@@ -249,6 +409,14 @@ func (h *ImageHandler) UpdateImage(c *gin.Context) {
 
 	// Update in database
 	if err := h.repo.Update(image); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "UPDATE_IMAGE_DB_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "UpdateImage",
+			"imageID":   imageID,
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to update image")
 		response.InternalError(c, "Failed to update image")
 		return
 	}
@@ -275,6 +443,14 @@ func (h *ImageHandler) DeleteImage(c *gin.Context) {
 
 	imageID, err := strconv.Atoi(imageIDStr)
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation":  "DELETE_IMAGE_INVALID_ID",
+			"where":      "backend/internal/application/handler/image.go",
+			"function":   "DeleteImage",
+			"imageIDStr": imageIDStr,
+			"userID":     userID,
+			"error":      err.Error(),
+		}).Warn("Invalid image ID")
 		response.BadRequest(c, "Invalid image ID")
 		return
 	}
@@ -283,11 +459,27 @@ func (h *ImageHandler) DeleteImage(c *gin.Context) {
 	// Get image details for ownership check, audit log and file cleanup
 	image, err := h.repo.GetByID(uint(imageID))
 	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_IMAGE_NOT_FOUND",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "DeleteImage",
+			"imageID":   imageID,
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Warn("Image not found")
 		response.NotFound(c, "Image not found")
 		return
 	}
 
 	if image.OwnerID != userID {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_IMAGE_FORBIDDEN",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "DeleteImage",
+			"imageID":   imageID,
+			"ownerID":   image.OwnerID,
+			"userID":    userID,
+		}).Warn("Permission denied to delete image")
 		response.ForbiddenWithDetails(c, "You don't have permission to delete this image", map[string]interface{}{
 			"resource_type": "image",
 			"resource_id":   image.ID,
@@ -301,6 +493,14 @@ func (h *ImageHandler) DeleteImage(c *gin.Context) {
 
 	// Delete from database first
 	if err := h.repo.Delete(uint(imageID)); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_IMAGE_DB_ERROR",
+			"where":     "backend/internal/application/handler/image.go",
+			"function":  "DeleteImage",
+			"imageID":   imageID,
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to delete image")
 		response.InternalError(c, "Failed to delete image")
 		return
 	}

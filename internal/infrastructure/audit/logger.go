@@ -13,6 +13,7 @@ var (
 	CreateLogger *logrus.Logger
 	UpdateLogger *logrus.Logger
 	DeleteLogger *logrus.Logger
+	ErrorLogger  *logrus.Logger
 	once         sync.Once
 )
 
@@ -22,6 +23,7 @@ func Initialize() {
 		CreateLogger = setupAuditLogger("create.log")
 		UpdateLogger = setupAuditLogger("update.log")
 		DeleteLogger = setupAuditLogger("delete.log")
+		ErrorLogger = setupAuditLogger("error.log")
 	})
 }
 
@@ -47,6 +49,14 @@ func GetDeleteLogger() *logrus.Logger {
 		Initialize()
 	}
 	return DeleteLogger
+}
+
+// GetErrorLogger returns ErrorLogger, initializing if needed
+func GetErrorLogger() *logrus.Logger {
+	if ErrorLogger == nil {
+		Initialize()
+	}
+	return ErrorLogger
 }
 
 // setupAuditLogger creates a dedicated logger for specific CRUD operations

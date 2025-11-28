@@ -51,7 +51,7 @@ func setupErrorLogger(filename string) *logrus.Logger {
 	// Configure log rotation
 	logFile := &lumberjack.Logger{
 		Filename:   filepath.Join(errorsDir, filename),
-		MaxSize:    10,   // megabytes
+		MaxSize:    100,  // megabytes
 		MaxBackups: 30,   // files
 		MaxAge:     90,   // days
 		Compress:   true, // gzip
