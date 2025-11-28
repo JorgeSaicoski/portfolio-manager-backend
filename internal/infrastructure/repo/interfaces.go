@@ -42,8 +42,8 @@ type SectionRepository interface {
 	Update(section *models2.Section) error
 	UpdatePosition(id uint, position uint) error
 	BulkUpdatePositions(items []struct {
-		ID       uint
-		Position uint
+		ID       uint `json:"id" binding:"required"`
+		Position uint `json:"position" binding:"required,min=1"`
 	}) error
 	Delete(id uint) error
 	List(limit, offset int) ([]models2.Section, error)
@@ -72,8 +72,8 @@ type CategoryRepository interface {
 	Update(category *models2.Category) error
 	UpdatePosition(id uint, position uint) error
 	BulkUpdatePositions(items []struct {
-		ID       uint
-		Position uint
+		ID       uint `json:"id" binding:"required"`
+		Position uint `json:"position" binding:"required,min=1"`
 	}) error
 	Delete(id uint) error
 	List(limit, offset int) ([]models2.Category, error)

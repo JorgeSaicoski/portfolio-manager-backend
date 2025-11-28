@@ -122,8 +122,8 @@ func (r *sectionRepository) GetByIDs(ids []uint) ([]*models.Section, error) {
 
 // BulkUpdatePositions updates positions for multiple sections in a transaction
 func (r *sectionRepository) BulkUpdatePositions(items []struct {
-	ID       uint
-	Position uint
+	ID       uint `json:"id" binding:"required"`
+	Position uint `json:"position" binding:"required,min=1"`
 }) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		for _, item := range items {

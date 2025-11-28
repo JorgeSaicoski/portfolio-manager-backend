@@ -88,8 +88,8 @@ func (r *categoryRepository) GetByIDs(ids []uint) ([]*models.Category, error) {
 
 // BulkUpdatePositions updates positions for multiple categories in a transaction
 func (r *categoryRepository) BulkUpdatePositions(items []struct {
-	ID       uint
-	Position uint
+	ID       uint `json:"id" binding:"required"`
+	Position uint `json:"position" binding:"required,min=1"`
 }) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		for _, item := range items {
