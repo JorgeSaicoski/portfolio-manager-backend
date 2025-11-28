@@ -132,6 +132,7 @@ func (s *Server) setupRoutes() {
 	s.router.RegisterSectionRoutes(api)
 	s.router.RegisterSectionContentRoutes(api)
 	s.router.RegisterImageRoutes(api)
+	s.router.RegisterUserRoutes(api)
 }
 
 func (s *Server) healthHandler(c *gin.Context) {

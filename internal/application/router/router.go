@@ -15,6 +15,7 @@ type Router struct {
 	sectionHandler        *handler2.SectionHandler
 	sectionContentHandler *handler2.SectionContentHandler
 	imageHandler          *handler2.ImageHandler
+	userHandler           *handler2.UserHandler
 	imageRepo             repo2.ImageRepository
 	metrics               *metrics.Collector
 }
@@ -38,6 +39,13 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 	imageRepo := repo2.NewImageRepository(db)
 	imageHandler := handler2.NewImageHandler(imageRepo, metrics)
 
+	userHandler := handler2.NewUserHandler(
+		portfolioRepo,
+		categoryRepo,
+		sectionRepo,
+		projectRepo,
+	)
+
 	return &Router{
 		db:                    db,
 		portfolioHandler:      portfolioHandler,
@@ -46,6 +54,7 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 		sectionHandler:        sectionHandler,
 		sectionContentHandler: sectionContentHandler,
 		imageHandler:          imageHandler,
+		userHandler:           userHandler,
 		imageRepo:             imageRepo,
 		metrics:               metrics,
 	}
