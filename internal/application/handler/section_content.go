@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"strconv"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
@@ -19,14 +20,16 @@ type SectionContentHandler struct {
 	repo          repo.SectionContentRepository
 	sectionRepo   repo.SectionRepository   // For authorization checks
 	portfolioRepo repo.PortfolioRepository // For full ownership validation
+	imageRepo     repo.ImageRepository     // For cleaning up uploaded images
 	metrics       *metrics.Collector
 }
 
-func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionContentHandler {
+func NewSectionContentHandler(repo repo.SectionContentRepository, sectionRepo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, imageRepo repo.ImageRepository, metrics *metrics.Collector) *SectionContentHandler {
 	return &SectionContentHandler{
 		repo:          repo,
 		sectionRepo:   sectionRepo,
 		portfolioRepo: portfolioRepo,
+		imageRepo:     imageRepo,
 		metrics:       metrics,
 	}
 }
@@ -497,6 +500,36 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 		}).Warn("Access denied")
 		resp.Forbidden(c, "Access denied")
 		return
+	}
+
+	// Check if content has an uploaded image and delete it
+	if existing.Metadata != nil && *existing.Metadata != "" {
+		var metadata map[string]interface{}
+		if err := json.Unmarshal([]byte(*existing.Metadata), &metadata); err == nil {
+			if imageIDFloat, ok := metadata["image_id"].(float64); ok {
+				imageID := uint(imageIDFloat)
+				// Delete the Image record (will cascade to filesystem cleanup)
+				if err := h.imageRepo.DeleteImage(imageID); err != nil {
+					// Log error but don't fail the content deletion
+					audit.GetErrorLogger().WithFields(logrus.Fields{
+						"operation": "DELETE_SECTION_CONTENT_IMAGE_CLEANUP_WARNING",
+						"where":     "backend/internal/application/handler/section_content.go",
+						"function":  "Delete",
+						"contentID": id,
+						"imageID":   imageID,
+						"userID":    userID,
+						"error":     err.Error(),
+					}).Warn("Failed to delete associated image, but continuing with content deletion")
+				} else {
+					audit.GetDeleteLogger().WithFields(logrus.Fields{
+						"operation": "DELETE_SECTION_CONTENT_IMAGE_CLEANUP",
+						"contentID": id,
+						"imageID":   imageID,
+						"userID":    userID,
+					}).Info("Associated uploaded image deleted successfully")
+				}
+			}
+		}
 	}
 
 	// Delete content

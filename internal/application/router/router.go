@@ -33,11 +33,11 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 	sectionRepo := repo2.NewSectionRepository(db)
 	sectionHandler := handler2.NewSectionHandler(sectionRepo, portfolioRepo, metrics)
 
-	sectionContentRepo := repo2.NewSectionContentRepository(db)
-	sectionContentHandler := handler2.NewSectionContentHandler(sectionContentRepo, sectionRepo, portfolioRepo, metrics)
-
 	imageRepo := repo2.NewImageRepository(db)
 	imageHandler := handler2.NewImageHandler(imageRepo, metrics)
+
+	sectionContentRepo := repo2.NewSectionContentRepository(db)
+	sectionContentHandler := handler2.NewSectionContentHandler(sectionContentRepo, sectionRepo, portfolioRepo, imageRepo, metrics)
 
 	userHandler := handler2.NewUserHandler(
 		portfolioRepo,
