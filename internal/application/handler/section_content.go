@@ -509,7 +509,7 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 			if imageIDFloat, ok := metadata["image_id"].(float64); ok {
 				imageID := uint(imageIDFloat)
 				// Delete the Image record (will cascade to filesystem cleanup)
-				if err := h.imageRepo.DeleteImage(imageID); err != nil {
+				if err := h.imageRepo.Delete(imageID); err != nil {
 					// Log error but don't fail the content deletion
 					audit.GetErrorLogger().WithFields(logrus.Fields{
 						"operation": "DELETE_SECTION_CONTENT_IMAGE_CLEANUP_WARNING",
@@ -530,31 +530,31 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 				}
 			}
 		}
-	}
 
-	// Delete content
-	if err := h.repo.Delete(uint(id)); err != nil {
-		audit.GetErrorLogger().WithFields(logrus.Fields{
-			"operation": "DELETE_SECTION_CONTENT_DB_ERROR",
-			"where":     "backend/internal/application/handler/section_content.go",
-			"function":  "Delete",
+		// Delete content
+		if err := h.repo.Delete(uint(id)); err != nil {
+			audit.GetErrorLogger().WithFields(logrus.Fields{
+				"operation": "DELETE_SECTION_CONTENT_DB_ERROR",
+				"where":     "backend/internal/application/handler/section_content.go",
+				"function":  "Delete",
+				"contentID": id,
+				"userID":    userID,
+				"sectionID": existing.SectionID,
+				"error":     err.Error(),
+			}).Error("Failed to delete section content")
+
+			resp.InternalError(c, "Failed to delete content")
+			return
+		}
+
+		audit.GetDeleteLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT",
 			"contentID": id,
 			"userID":    userID,
 			"sectionID": existing.SectionID,
-			"error":     err.Error(),
-		}).Error("Failed to delete section content")
+			"type":      existing.Type,
+		}).Info("Section content deleted successfully")
 
-		resp.InternalError(c, "Failed to delete content")
-		return
+		resp.OK(c, "message", "Content deleted successfully", "Success")
 	}
-
-	audit.GetDeleteLogger().WithFields(logrus.Fields{
-		"operation": "DELETE_SECTION_CONTENT",
-		"contentID": id,
-		"userID":    userID,
-		"sectionID": existing.SectionID,
-		"type":      existing.Type,
-	}).Info("Section content deleted successfully")
-
-	resp.OK(c, "message", "Content deleted successfully", "Success")
 }
