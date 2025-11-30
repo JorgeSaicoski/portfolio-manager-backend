@@ -44,6 +44,8 @@ func NewRouter(db *gorm.DB, metrics *metrics.Collector) *Router {
 		categoryRepo,
 		sectionRepo,
 		projectRepo,
+		imageRepo,
+		sectionContentRepo,
 	)
 
 	return &Router{
