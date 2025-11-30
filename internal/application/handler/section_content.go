@@ -434,7 +434,10 @@ func (h *SectionContentHandler) UpdateOrder(c *gin.Context) {
 		return
 	}
 
-	resp.OK(c, "message", "Content order updated successfully", "Success")
+	// Reflect the updated order in the returned DTO
+	existing.Order = req.Order
+
+	resp.OK(c, "content", response.ToSectionContentResponse(existing), "Content order updated successfully")
 }
 
 // Delete deletes a section content block
@@ -530,31 +533,31 @@ func (h *SectionContentHandler) Delete(c *gin.Context) {
 				}
 			}
 		}
+	}
 
-		// Delete content
-		if err := h.repo.Delete(uint(id)); err != nil {
-			audit.GetErrorLogger().WithFields(logrus.Fields{
-				"operation": "DELETE_SECTION_CONTENT_DB_ERROR",
-				"where":     "backend/internal/application/handler/section_content.go",
-				"function":  "Delete",
-				"contentID": id,
-				"userID":    userID,
-				"sectionID": existing.SectionID,
-				"error":     err.Error(),
-			}).Error("Failed to delete section content")
-
-			resp.InternalError(c, "Failed to delete content")
-			return
-		}
-
-		audit.GetDeleteLogger().WithFields(logrus.Fields{
-			"operation": "DELETE_SECTION_CONTENT",
+	// Delete content (always attempt to delete, regardless of metadata)
+	if err := h.repo.Delete(uint(id)); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "DELETE_SECTION_CONTENT_DB_ERROR",
+			"where":     "backend/internal/application/handler/section_content.go",
+			"function":  "Delete",
 			"contentID": id,
 			"userID":    userID,
 			"sectionID": existing.SectionID,
-			"type":      existing.Type,
-		}).Info("Section content deleted successfully")
+			"error":     err.Error(),
+		}).Error("Failed to delete section content")
 
-		resp.OK(c, "message", "Content deleted successfully", "Success")
+		resp.InternalError(c, "Failed to delete content")
+		return
 	}
+
+	audit.GetDeleteLogger().WithFields(logrus.Fields{
+		"operation": "DELETE_SECTION_CONTENT",
+		"contentID": id,
+		"userID":    userID,
+		"sectionID": existing.SectionID,
+		"type":      existing.Type,
+	}).Info("Section content deleted successfully")
+
+	resp.OK(c, "message", "Content deleted successfully", "Success")
 }

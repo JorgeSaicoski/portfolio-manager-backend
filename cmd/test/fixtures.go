@@ -1,6 +1,8 @@
 package test
 
 import (
+	"fmt"
+
 	models2 "github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
 	"gorm.io/gorm"
 )
@@ -138,6 +140,48 @@ func CreateTestImageWithAlt(db *gorm.DB, entityID uint, entityType string, owner
 	}
 	db.Create(image)
 	return image
+}
+
+// SectionContent fixtures
+func CreateTestSectionContent(db *gorm.DB, sectionID uint, ownerID string) *models2.SectionContent {
+	content := &models2.SectionContent{
+		SectionID: sectionID,
+		Type:      "text",
+		Content:   "Test content",
+		Order:     0,
+		OwnerID:   ownerID,
+	}
+	db.Create(content)
+	return content
+}
+
+func CreateTestSectionContentWithOrder(db *gorm.DB, sectionID uint, ownerID string, order uint) *models2.SectionContent {
+	content := &models2.SectionContent{
+		SectionID: sectionID,
+		Type:      "text",
+		Content:   fmt.Sprintf("Content order %d", order),
+		Order:     order,
+		OwnerID:   ownerID,
+	}
+	db.Create(content)
+	return content
+}
+
+func CreateTestSectionContentWithImage(db *gorm.DB, sectionID uint, ownerID string) *models2.SectionContent {
+	// Create an image first
+	image := CreateTestImage(db, sectionID, "section", ownerID)
+
+	metadata := fmt.Sprintf(`{"image_id": %d}`, image.ID)
+	content := &models2.SectionContent{
+		SectionID: sectionID,
+		Type:      "image",
+		Content:   "Image description",
+		Order:     0,
+		Metadata:  &metadata,
+		OwnerID:   ownerID,
+	}
+	db.Create(content)
+	return content
 }
 
 func stringPtr(s string) *string {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
@@ -39,7 +40,10 @@ func TestMain(m *testing.M) {
 	}()
 
 	// Wait for server to be ready
-	// In production, you'd want a proper health check here
+	if err := waitForServer(baseURL, 50); err != nil {
+		testLogger.Fatalf("Test server not ready: %v", err)
+	}
+	fmt.Println("Test server is ready")
 
 	// Run all tests
 	code := m.Run()
@@ -130,7 +134,9 @@ func cleanDatabase(db *gorm.DB) {
 	// Disable foreign key checks
 	db.Exec("SET session_replication_role = 'replica'")
 
-	// Truncate all tables
+	// Truncate all tables in proper order (children before parents)
+	db.Exec("TRUNCATE TABLE section_contents CASCADE")
+	db.Exec("TRUNCATE TABLE images CASCADE")
 	db.Exec("TRUNCATE TABLE projects CASCADE")
 	db.Exec("TRUNCATE TABLE categories CASCADE")
 	db.Exec("TRUNCATE TABLE sections CASCADE")
@@ -161,6 +167,24 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// waitForServer polls the health endpoint until the server is ready
+func waitForServer(baseURL string, maxAttempts int) error {
+	for i := 0; i < maxAttempts; i++ {
+		resp, err := http.Get(baseURL + "/health")
+		if err == nil && resp.StatusCode == 200 {
+			resp.Body.Close()
+			return nil
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if i < maxAttempts-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	return fmt.Errorf("server did not become ready after %d attempts", maxAttempts)
 }
 
 // NewTestRecorder creates a new httptest.ResponseRecorder with proper setup
