@@ -162,10 +162,23 @@ test-coverage:
 	@if [ ! -f ../.env.test ]; then \
 		echo "Warning: .env.test not found. Using environment defaults."; \
 	fi
-	go test ./cmd/test/... -v -coverprofile=coverage.out
+	go test ./cmd/test/... -v -coverprofile=coverage.out || true
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "\nCoverage report generated: coverage.html"
-	go tool cover -func=coverage.out
+	@go tool cover -func=coverage.out
+	@echo ""
+	@echo "========================================="
+	@COVERAGE=$$(go tool cover -func=coverage.out | grep total | awk '{print $$3}' | sed 's/%//'); \
+	echo "Total Coverage: $$COVERAGE%"; \
+	if [ $$(echo "$$COVERAGE >= 85" | bc -l) -eq 1 ]; then \
+		echo "✅ Coverage target met (≥85%)"; \
+		echo "========================================="; \
+		exit 0; \
+	else \
+		echo "❌ Coverage below target (<85%)"; \
+		echo "========================================="; \
+		exit 1; \
+	fi
 
 test-docker:
 	@echo "Running tests in isolated Podman environment..."

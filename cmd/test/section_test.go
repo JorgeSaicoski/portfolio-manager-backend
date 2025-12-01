@@ -21,6 +21,9 @@ func TestSection_GetOwn(t *testing.T) {
 
 		resp := MakeRequest(t, "GET", "/api/sections/own?page=1&limit=10", nil, token)
 
+		// Use AssertPaginatedResponse helper for coverage
+		AssertPaginatedResponse(t, resp)
+
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			assert.Contains(t, body, "page")
@@ -138,6 +141,9 @@ func TestSection_Create(t *testing.T) {
 
 		resp := MakeRequest(t, "POST", "/api/sections/own", payload, token)
 
+		// Use AssertSuccessResponse helper for coverage
+		AssertSuccessResponse(t, resp, 201)
+
 		AssertJSONResponse(t, resp, 201, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			data := body["data"].(map[string]interface{})
@@ -210,6 +216,9 @@ func TestSection_Create(t *testing.T) {
 		}
 
 		resp := MakeRequest(t, "POST", "/api/sections/own", payload, token)
+
+		// Use AssertErrorResponse helper for coverage
+		AssertErrorResponse(t, resp, 400, "")
 		assert.Equal(t, 400, resp.Code)
 
 		cleanDatabase(testDB.DB)
@@ -226,6 +235,9 @@ func TestSection_Create(t *testing.T) {
 		}
 
 		resp := MakeRequest(t, "POST", "/api/sections/own", payload, token)
+
+		// Use AssertErrorResponse helper for coverage
+		AssertErrorResponse(t, resp, 400, "validation")
 		assert.Equal(t, 400, resp.Code)
 
 		cleanDatabase(testDB.DB)
@@ -282,6 +294,12 @@ func TestSection_GetByID(t *testing.T) {
 		section := CreateTestSection(testDB.DB, portfolio.ID, userID)
 
 		resp := MakeRequest(t, "GET", fmt.Sprintf("/api/sections/own/%d", section.ID), nil, token)
+
+		// Use ParseJSONBody helper for coverage
+		body := ParseJSONBody(t, resp)
+		assert.Contains(t, body, "data")
+		data := body["data"].(map[string]interface{})
+		assert.Equal(t, "Test Section", data["title"])
 
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")

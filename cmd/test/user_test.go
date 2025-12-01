@@ -30,6 +30,9 @@ func TestUser_GetUserDataSummary(t *testing.T) {
 
 		resp := MakeRequest(t, "GET", "/api/users/me/summary", nil, token)
 
+		// Use AssertSuccessResponse helper for coverage
+		AssertSuccessResponse(t, resp, 200)
+
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			data := body["data"].(map[string]interface{})

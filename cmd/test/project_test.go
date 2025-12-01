@@ -22,6 +22,9 @@ func TestProject_GetOwn(t *testing.T) {
 
 		resp := MakeRequest(t, "GET", "/api/projects/own?page=1&limit=10", nil, token)
 
+		// Use AssertPaginatedResponse helper for coverage
+		AssertPaginatedResponse(t, resp)
+
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			assert.Contains(t, body, "page")

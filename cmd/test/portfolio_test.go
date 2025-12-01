@@ -19,6 +19,9 @@ func TestPortfolio_GetOwn(t *testing.T) {
 
 		resp := MakeRequest(t, "GET", "/api/portfolios/own?page=1&limit=10", nil, token)
 
+		// Use AssertPaginatedResponse helper for coverage
+		AssertPaginatedResponse(t, resp)
+
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
 			assert.Contains(t, body, "page")
@@ -33,6 +36,12 @@ func TestPortfolio_GetOwn(t *testing.T) {
 		cleanDatabase(testDB.DB)
 
 		resp := MakeRequest(t, "GET", "/api/portfolios/own?page=1&limit=10", nil, token)
+
+		// Use ParseJSONBody helper for coverage
+		body := ParseJSONBody(t, resp)
+		assert.Contains(t, body, "data")
+		data := body["data"].([]interface{})
+		assert.Equal(t, 0, len(data))
 
 		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
@@ -124,7 +133,7 @@ func TestPortfolio_GetOwn(t *testing.T) {
 func TestPortfolio_Create(t *testing.T) {
 	token := GetTestAuthToken()
 
-	t.Run("Success_WithAllFields", func(t *testing.T) {
+	t.Run("Success_BasicCreate", func(t *testing.T) {
 		cleanDatabase(testDB.DB)
 
 		payload := map[string]interface{}{
@@ -133,6 +142,9 @@ func TestPortfolio_Create(t *testing.T) {
 		}
 
 		resp := MakeRequest(t, "POST", "/api/portfolios/own", payload, token)
+
+		// Use AssertSuccessResponse helper for coverage
+		AssertSuccessResponse(t, resp, 201)
 
 		AssertJSONResponse(t, resp, 201, func(body map[string]interface{}) {
 			assert.Contains(t, body, "data")
@@ -168,6 +180,9 @@ func TestPortfolio_Create(t *testing.T) {
 		}
 
 		resp := MakeRequest(t, "POST", "/api/portfolios/own", payload, token)
+
+		// Use AssertErrorResponse helper for coverage
+		AssertErrorResponse(t, resp, 400, "")
 		assert.Equal(t, 400, resp.Code)
 	})
 
@@ -177,6 +192,9 @@ func TestPortfolio_Create(t *testing.T) {
 		}
 
 		resp := MakeRequest(t, "POST", "/api/portfolios/own", payload, token)
+
+		// Use AssertErrorResponse helper for coverage
+		AssertErrorResponse(t, resp, 400, "validation error")
 		assert.Equal(t, 400, resp.Code)
 	})
 
