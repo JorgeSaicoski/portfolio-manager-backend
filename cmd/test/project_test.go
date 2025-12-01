@@ -47,6 +47,82 @@ func TestProject_GetOwn(t *testing.T) {
 		resp := MakeRequest(t, "GET", "/api/projects/own", nil, "")
 		assert.Equal(t, 401, resp.Code)
 	})
+
+	t.Run("Pagination_LargePageNumber", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		CreateTestProject(testDB.DB, category.ID, userID) // Create 1 item
+
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=100&limit=10", nil, token)
+		assert.Equal(t, 200, resp.Code)
+
+		AssertJSONResponse(t, resp, 200, func(data map[string]interface{}) {
+			items := data["data"].([]interface{})
+			assert.Equal(t, 0, len(items)) // No items on page 100
+			assert.Equal(t, float64(100), data["page"])
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Pagination_ExceedMaxLimit", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=1&limit=101", nil, token)
+		assert.Equal(t, 400, resp.Code)
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Pagination_InvalidPageZero", func(t *testing.T) {
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=0&limit=10", nil, token)
+		assert.Equal(t, 400, resp.Code)
+	})
+
+	t.Run("Pagination_InvalidNegativePage", func(t *testing.T) {
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=-1&limit=10", nil, token)
+		assert.Equal(t, 400, resp.Code)
+	})
+
+	t.Run("Pagination_BoundaryExactlyAtLimit", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		// Create exactly 10 items
+		for i := 0; i < 10; i++ {
+			CreateTestProjectWithTitle(testDB.DB, category.ID, userID, fmt.Sprintf("Project %d", i))
+		}
+
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=1&limit=10", nil, token)
+		AssertJSONResponse(t, resp, 200, func(data map[string]interface{}) {
+			items := data["data"].([]interface{})
+			assert.Equal(t, 10, len(items))
+			assert.Equal(t, float64(1), data["total_pages"])
+		})
+
+		cleanDatabase(testDB.DB)
+	})
+
+	t.Run("Pagination_SecondPageWithRemainder", func(t *testing.T) {
+		cleanDatabase(testDB.DB)
+		portfolio := CreateTestPortfolio(testDB.DB, userID)
+		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
+		// Create 15 items (page 1: 10, page 2: 5)
+		for i := 0; i < 15; i++ {
+			CreateTestProjectWithTitle(testDB.DB, category.ID, userID, fmt.Sprintf("Project %d", i))
+		}
+
+		resp := MakeRequest(t, "GET", "/api/projects/own?page=2&limit=10", nil, token)
+		AssertJSONResponse(t, resp, 200, func(data map[string]interface{}) {
+			items := data["data"].([]interface{})
+			assert.Equal(t, 5, len(items))
+			assert.Equal(t, float64(2), data["page"])
+			assert.Equal(t, float64(2), data["total_pages"])
+		})
+
+		cleanDatabase(testDB.DB)
+	})
 }
 
 // TestProject_Create tests creating a new project
