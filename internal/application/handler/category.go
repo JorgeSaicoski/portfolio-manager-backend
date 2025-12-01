@@ -57,7 +57,7 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	categories, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	categories, total, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_CATEGORIES_BY_USER_DB_ERROR",
@@ -70,7 +70,7 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithPagination(c, http.StatusOK, "categories", categories, page, limit)
+	response.SuccessWithPagination(c, http.StatusOK, "categories", categories, page, limit, total)
 }
 func (h *CategoryHandler) Update(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware

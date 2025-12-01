@@ -116,11 +116,22 @@ func (r *categoryRepository) List(limit, offset int) ([]models.Category, error) 
 }
 
 // GetByOwnerIDBasic For list views - categories owned by user
-func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Category, error) {
+func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Category, int64, error) {
 	var categories []models.Category
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Category{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
 		Find(&categories).Error
-	return categories, err
+
+	return categories, total, err
 }

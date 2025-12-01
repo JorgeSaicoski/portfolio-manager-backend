@@ -63,7 +63,7 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	}).Info("Starting user data cleanup")
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
+	portfolios, _, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "CLEANUP_USER_DATA_DB_ERROR",
@@ -223,7 +223,7 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	}
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
+	portfolios, _, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_USER_DATA_SUMMARY_DB_ERROR",

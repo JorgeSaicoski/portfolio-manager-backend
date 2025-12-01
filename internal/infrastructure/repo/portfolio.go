@@ -20,13 +20,24 @@ func (r *portfolioRepository) Create(portfolio *models.Portfolio) error {
 }
 
 // For list views - only basic portfolio info
-func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Portfolio, error) {
+func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Portfolio, int64, error) {
 	var portfolios []models.Portfolio
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Portfolio{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, owner_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
 		Find(&portfolios).Error
-	return portfolios, err
+
+	return portfolios, total, err
 }
 
 // For detail views - with relationships using JOIN

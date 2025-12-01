@@ -41,7 +41,7 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 	page, limit := pagination.GetPageAndLimit()
 	offset := pagination.GetOffset()
 
-	portfolios, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	portfolios, total, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_PORTFOLIOS_BY_USER_DB_ERROR",
@@ -60,6 +60,7 @@ func (h *PortfolioHandler) GetByUser(c *gin.Context) {
 		Data:    dtoresponse.ToPortfolioListResponse(portfolios),
 		Page:    page,
 		Limit:   limit,
+		Total:   total,
 		Message: "Success",
 	})
 }

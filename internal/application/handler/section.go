@@ -56,7 +56,7 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	sections, err := h.repo.GetByOwnerID(userID, limit, offset)
+	sections, total, err := h.repo.GetByOwnerID(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_SECTIONS_BY_USER_DB_ERROR",
@@ -69,7 +69,7 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithPagination(c, 200, "sections", sections, page, limit)
+	response.SuccessWithPagination(c, 200, "sections", sections, page, limit, total)
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {

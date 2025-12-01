@@ -23,14 +23,25 @@ func (r *sectionRepository) Create(section *models.Section) error {
 }
 
 // GetByOwnerID For list views - only basic section info for a specific owner
-func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, error) {
+func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, int64, error) {
 	var sections []models.Section
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Section{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&sections).Error
-	return sections, err
+
+	return sections, total, err
 }
 
 // GetByID For detail views - basic section info

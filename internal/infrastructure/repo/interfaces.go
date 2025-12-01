@@ -8,7 +8,7 @@ type PortfolioRepository interface {
 	Create(portfolio *models2.Portfolio) error
 	GetByID(id uint) (*models2.Portfolio, error)
 	GetByIDWithRelations(id uint) (*models2.Portfolio, error)
-	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Portfolio, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Portfolio, int64, error)
 	GetByIDBasic(id uint) (*models2.Portfolio, error)
 	Update(portfolio *models2.Portfolio) error
 	Delete(id uint) error
@@ -19,7 +19,7 @@ type PortfolioRepository interface {
 type ProjectRepository interface {
 	Create(project *models2.Project) error
 	GetByID(id uint) (*models2.Project, error)
-	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Project, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Project, int64, error)
 	GetByCategoryID(categoryID string) ([]models2.Project, error)
 	Update(project *models2.Project) error
 	UpdatePosition(id uint, position uint) error
@@ -35,7 +35,7 @@ type SectionRepository interface {
 	GetByID(id uint) (*models2.Section, error)
 	GetByIDWithRelations(id uint) (*models2.Section, error)
 	GetByIDs(ids []uint) ([]*models2.Section, error)
-	GetByOwnerID(ownerID string, limit, offset int) ([]models2.Section, error)
+	GetByOwnerID(ownerID string, limit, offset int) ([]models2.Section, int64, error)
 	GetByPortfolioID(portfolioID string) ([]models2.Section, error)
 	GetByPortfolioIDWithRelations(portfolioID string) ([]models2.Section, error)
 	GetByType(sectionType string) ([]models2.Section, error)
@@ -68,7 +68,7 @@ type CategoryRepository interface {
 	GetByIDs(ids []uint) ([]*models2.Category, error)
 	GetByPortfolioID(portfolioID string) ([]models2.Category, error)
 	GetByPortfolioIDWithRelations(portfolioID string) ([]models2.Category, error)
-	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Category, error)
+	GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models2.Category, int64, error)
 	Update(category *models2.Category) error
 	UpdatePosition(id uint, position uint) error
 	BulkUpdatePositions(items []struct {

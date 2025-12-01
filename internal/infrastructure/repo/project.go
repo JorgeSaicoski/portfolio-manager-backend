@@ -34,15 +34,26 @@ func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 }
 
 // GetByOwnerIDBasic For list views - only basic project info for a specific owner
-func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Project, error) {
+func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Project, int64, error) {
 	var projects []models.Project
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Project{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
 		Preload("Images").
 		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&projects).Error
-	return projects, err
+
+	return projects, total, err
 }
 
 // GetByCategoryID For list views - projects in a category
