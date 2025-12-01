@@ -63,7 +63,59 @@ func (r *portfolioRepository) Update(portfolio *models.Portfolio) error {
 }
 
 func (r *portfolioRepository) Delete(id uint) error {
-	return r.db.Delete(&models.Portfolio{}, id).Error
+	// Use a transaction to ensure all cascading deletes succeed or none do
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// First, get all categories for this portfolio
+		var categoryIDs []uint
+		if err := tx.Model(&models.Category{}).
+			Where("portfolio_id = ?", id).
+			Pluck("id", &categoryIDs).Error; err != nil {
+			return err
+		}
+
+		// Soft delete all projects in those categories
+		if len(categoryIDs) > 0 {
+			if err := tx.Where("category_id IN ?", categoryIDs).
+				Delete(&models.Project{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Soft delete all categories for this portfolio
+		if err := tx.Where("portfolio_id = ?", id).
+			Delete(&models.Category{}).Error; err != nil {
+			return err
+		}
+
+		// Get all sections for this portfolio
+		var sectionIDs []uint
+		if err := tx.Model(&models.Section{}).
+			Where("portfolio_id = ?", id).
+			Pluck("id", &sectionIDs).Error; err != nil {
+			return err
+		}
+
+		// Soft delete all section contents in those sections
+		if len(sectionIDs) > 0 {
+			if err := tx.Where("section_id IN ?", sectionIDs).
+				Delete(&models.SectionContent{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Soft delete all sections for this portfolio
+		if err := tx.Where("portfolio_id = ?", id).
+			Delete(&models.Section{}).Error; err != nil {
+			return err
+		}
+
+		// Finally, soft delete the portfolio itself
+		if err := tx.Delete(&models.Portfolio{}, id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (r *portfolioRepository) List(limit, offset int) ([]models.Portfolio, error) {
