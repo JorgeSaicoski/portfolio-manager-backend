@@ -138,7 +138,7 @@ func TestUser_CleanupUserData(t *testing.T) {
 
 		assert.Equal(t, int64(1), portfolioCount)
 		assert.Equal(t, int64(1), categoryCount)
-		assert.Equal(t, int64(1), sectionCount)
+		assert.Equal(t, int64(0), sectionCount) // No section created in this test
 		assert.Equal(t, int64(1), projectCount)
 		assert.Equal(t, int64(1), imageCount)
 
