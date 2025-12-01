@@ -13,13 +13,14 @@ import (
 // Simple validation script to check if UserHandler compiles correctly
 func main() {
 	// Initialize database
-	database, err := db.InitDB()
-	if err != nil {
+	database := db.NewDatabase()
+	if err := database.Initialize(); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
 
-	// Initialize metrics
+	// Initialize metrics and start background collection
 	metricsCollector := metrics.NewCollector()
+	metricsCollector.StartMetricsCollection(database.DB)
 
 	// Initialize repositories
 	portfolioRepo := repo.NewPortfolioRepository(database.DB)
