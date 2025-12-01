@@ -10,5 +10,5 @@ type Section struct {
 	Position    uint             `json:"position" gorm:"default:0"`
 	OwnerID     string           `json:"ownerId,omitempty"`
 	PortfolioID uint             `json:"portfolio_id"`
-	Contents    []SectionContent `json:"contents,omitempty" gorm:"foreignKey:SectionID"`
+	Contents    []SectionContent `json:"contents,omitempty" gorm:"foreignKey:SectionID;constraint:OnDelete:CASCADE"`
 }

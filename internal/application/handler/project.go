@@ -49,7 +49,7 @@ func (h *ProjectHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	projects, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	projects, total, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_PROJECTS_BY_USER_DB_ERROR",
@@ -62,7 +62,7 @@ func (h *ProjectHandler) GetByUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithPagination(c, 200, "projects", projects, page, limit)
+	response.SuccessWithPagination(c, 200, "projects", projects, page, limit, total)
 }
 
 func (h *ProjectHandler) GetByCategory(c *gin.Context) {

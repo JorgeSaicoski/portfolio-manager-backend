@@ -44,6 +44,9 @@ func (s *Server) Start() error {
 	s.setupMiddleware()
 	s.setupRoutes()
 
+	// Start background metrics collection (runs every 30 seconds)
+	s.metrics.StartMetricsCollection(s.db)
+
 	s.server = &http.Server{
 		Addr:         ":" + s.port,
 		Handler:      s.engine,
@@ -132,6 +135,7 @@ func (s *Server) setupRoutes() {
 	s.router.RegisterSectionRoutes(api)
 	s.router.RegisterSectionContentRoutes(api)
 	s.router.RegisterImageRoutes(api)
+	s.router.RegisterUserRoutes(api)
 }
 
 func (s *Server) healthHandler(c *gin.Context) {

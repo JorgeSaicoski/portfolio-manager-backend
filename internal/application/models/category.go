@@ -9,5 +9,5 @@ type Category struct {
 	Position    uint      `json:"position" gorm:"default:0"`
 	OwnerID     string    `json:"ownerId,omitempty"`
 	PortfolioID uint      `json:"portfolio_id"`
-	Projects    []Project `json:"projects" gorm:"foreignKey:CategoryID"`
+	Projects    []Project `json:"projects" gorm:"foreignKey:CategoryID;constraint:OnDelete:CASCADE"`
 }

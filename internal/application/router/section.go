@@ -17,6 +17,7 @@ func (r *Router) RegisterSectionRoutes(apiGroup *gin.RouterGroup) {
 		protected.GET("/:id", r.sectionHandler.GetByID)
 		protected.PUT("/:id", r.sectionHandler.Update)
 		protected.PUT("/:id/position", r.sectionHandler.UpdatePosition)
+		protected.PUT("/reorder", r.sectionHandler.BulkReorder)
 		protected.DELETE("/:id", r.sectionHandler.Delete)
 	}
 

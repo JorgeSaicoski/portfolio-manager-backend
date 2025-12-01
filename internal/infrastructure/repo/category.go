@@ -77,6 +77,32 @@ func (r *categoryRepository) UpdatePosition(id uint, position uint) error {
 	return r.db.Model(&models.Category{}).Where("id = ?", id).Update("position", position).Error
 }
 
+// GetByIDs fetches multiple categories by their IDs
+func (r *categoryRepository) GetByIDs(ids []uint) ([]*models.Category, error) {
+	var categories []*models.Category
+	if err := r.db.Where("id IN ?", ids).Find(&categories).Error; err != nil {
+		return nil, err
+	}
+	return categories, nil
+}
+
+// BulkUpdatePositions updates positions for multiple categories in a transaction
+func (r *categoryRepository) BulkUpdatePositions(items []struct {
+	ID       uint `json:"id" binding:"required"`
+	Position uint `json:"position" binding:"required,min=1"`
+}) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, item := range items {
+			if err := tx.Model(&models.Category{}).
+				Where("id = ?", item.ID).
+				Update("position", item.Position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+}
+
 func (r *categoryRepository) Delete(id uint) error {
 	return r.db.Delete(&models.Category{}, id).Error
 }
@@ -90,11 +116,22 @@ func (r *categoryRepository) List(limit, offset int) ([]models.Category, error) 
 }
 
 // GetByOwnerIDBasic For list views - categories owned by user
-func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Category, error) {
+func (r *categoryRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Category, int64, error) {
 	var categories []models.Category
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Category{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, position, owner_id, portfolio_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
 		Find(&categories).Error
-	return categories, err
+
+	return categories, total, err
 }

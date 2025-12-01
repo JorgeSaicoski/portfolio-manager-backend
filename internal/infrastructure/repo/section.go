@@ -23,14 +23,25 @@ func (r *sectionRepository) Create(section *models.Section) error {
 }
 
 // GetByOwnerID For list views - only basic section info for a specific owner
-func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, error) {
+func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]models.Section, int64, error) {
 	var sections []models.Section
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Section{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, type, position, portfolio_id, owner_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
 		Find(&sections).Error
-	return sections, err
+
+	return sections, total, err
 }
 
 // GetByID For detail views - basic section info
@@ -109,6 +120,32 @@ func (r *sectionRepository) Update(section *models.Section) error {
 // UpdatePosition updates only the position field of a section
 func (r *sectionRepository) UpdatePosition(id uint, position uint) error {
 	return r.db.Model(&models.Section{}).Where("id = ?", id).Update("position", position).Error
+}
+
+// GetByIDs fetches multiple sections by their IDs
+func (r *sectionRepository) GetByIDs(ids []uint) ([]*models.Section, error) {
+	var sections []*models.Section
+	if err := r.db.Where("id IN ?", ids).Find(&sections).Error; err != nil {
+		return nil, err
+	}
+	return sections, nil
+}
+
+// BulkUpdatePositions updates positions for multiple sections in a transaction
+func (r *sectionRepository) BulkUpdatePositions(items []struct {
+	ID       uint `json:"id" binding:"required"`
+	Position uint `json:"position" binding:"required,min=1"`
+}) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		for _, item := range items {
+			if err := tx.Model(&models.Section{}).
+				Where("id = ?", item.ID).
+				Update("position", item.Position).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *sectionRepository) Delete(id uint) error {

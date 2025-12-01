@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/db"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/server"
@@ -39,7 +40,10 @@ func TestMain(m *testing.M) {
 	}()
 
 	// Wait for server to be ready
-	// In production, you'd want a proper health check here
+	if err := waitForServer(baseURL, 50); err != nil {
+		testLogger.Fatalf("Test server not ready: %v", err)
+	}
+	fmt.Println("Test server is ready")
 
 	// Run all tests
 	code := m.Run()
@@ -83,13 +87,22 @@ func setupTestEnvironment() {
 
 func setupTestDatabase() *db.Database {
 	database := db.NewDatabase()
-	database.Initialize()
+	if err := database.Initialize(); err != nil {
+		fmt.Printf("FATAL: Failed to initialize test database: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Run migrations
-	database.Migrate()
+	if err := database.Migrate(); err != nil {
+		fmt.Printf("FATAL: Failed to migrate test database: %v\n", err)
+		os.Exit(1)
+	}
 
 	// Clean database before tests
-	cleanDatabase(database.DB)
+	if err := cleanDatabaseWithError(database.DB); err != nil {
+		fmt.Printf("FATAL: Failed to clean test database: %v\n", err)
+		os.Exit(1)
+	}
 
 	return database
 }
@@ -110,34 +123,66 @@ func setupTestServer() *server.Server {
 
 func teardownTestServer() {
 	if testServer != nil {
-		ctx := context.Background()
-		testServer.Shutdown(ctx)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := testServer.Shutdown(ctx); err != nil {
+			testLogger.Printf("Error shutting down test server: %v", err)
+		}
 	}
 }
 
 func teardownTestDatabase() {
 	if testDB != nil && testDB.DB != nil {
-		cleanDatabase(testDB.DB)
+		if err := cleanDatabaseWithError(testDB.DB); err != nil {
+			fmt.Printf("Warning: Failed to clean database during teardown: %v\n", err)
+		}
 		sqlDB, err := testDB.DB.DB()
 		if err == nil {
-			sqlDB.Close()
+			if err := sqlDB.Close(); err != nil {
+				fmt.Printf("Warning: Failed to close database connection: %v\n", err)
+			}
 		}
 	}
 }
 
-// cleanDatabase truncates all tables
+// cleanDatabase truncates all tables - logs errors but doesn't fail (for use in tests)
 func cleanDatabase(db *gorm.DB) {
-	// Disable foreign key checks
-	db.Exec("SET session_replication_role = 'replica'")
+	if err := cleanDatabaseWithError(db); err != nil {
+		fmt.Printf("Warning: Database cleanup error: %v\n", err)
+	}
+}
 
-	// Truncate all tables
-	db.Exec("TRUNCATE TABLE projects CASCADE")
-	db.Exec("TRUNCATE TABLE categories CASCADE")
-	db.Exec("TRUNCATE TABLE sections CASCADE")
-	db.Exec("TRUNCATE TABLE portfolios CASCADE")
+// cleanDatabaseWithError truncates all tables and returns any errors (for use in setup/teardown)
+func cleanDatabaseWithError(db *gorm.DB) error {
+	// Disable foreign key checks
+	if err := db.Exec("SET session_replication_role = 'replica'").Error; err != nil {
+		return fmt.Errorf("failed to disable foreign key checks: %w", err)
+	}
+
+	// Truncate all tables in proper order (children before parents)
+	tables := []string{
+		"section_contents",
+		"images",
+		"projects",
+		"categories",
+		"sections",
+		"portfolios",
+	}
+
+	for _, table := range tables {
+		if err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error; err != nil {
+			// Re-enable foreign key checks before returning error
+			db.Exec("SET session_replication_role = 'origin'")
+			return fmt.Errorf("failed to truncate table %s: %w", table, err)
+		}
+	}
 
 	// Re-enable foreign key checks
-	db.Exec("SET session_replication_role = 'origin'")
+	if err := db.Exec("SET session_replication_role = 'origin'").Error; err != nil {
+		return fmt.Errorf("failed to re-enable foreign key checks: %w", err)
+	}
+
+	return nil
 }
 
 // Helper to run tests in a transaction (for isolation)
@@ -161,6 +206,24 @@ func getEnvOrDefault(key, defaultValue string) string {
 		return value
 	}
 	return defaultValue
+}
+
+// waitForServer polls the health endpoint until the server is ready
+func waitForServer(baseURL string, maxAttempts int) error {
+	for i := 0; i < maxAttempts; i++ {
+		resp, err := http.Get(baseURL + "/health")
+		if err == nil && resp.StatusCode == 200 {
+			resp.Body.Close()
+			return nil
+		}
+		if resp != nil {
+			resp.Body.Close()
+		}
+		if i < maxAttempts-1 {
+			time.Sleep(100 * time.Millisecond)
+		}
+	}
+	return fmt.Errorf("server did not become ready after %d attempts", maxAttempts)
 }
 
 // NewTestRecorder creates a new httptest.ResponseRecorder with proper setup

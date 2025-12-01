@@ -35,11 +35,12 @@ func SuccessWithKey(c *gin.Context, statusCode int, key string, data interface{}
 
 // SuccessWithPagination sends a standardized paginated success response
 // Note: Uses "data" as the standard key for consistency with REST API best practices
-func SuccessWithPagination(c *gin.Context, statusCode int, key string, data interface{}, page, limit int) {
+func SuccessWithPagination(c *gin.Context, statusCode int, key string, data interface{}, page, limit int, total int64) {
 	c.JSON(statusCode, gin.H{
 		"data":    data,
 		"page":    page,
 		"limit":   limit,
+		"total":   total,
 		"message": "Success",
 	})
 }

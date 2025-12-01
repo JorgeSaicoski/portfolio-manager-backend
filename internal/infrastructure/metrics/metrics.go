@@ -17,6 +17,10 @@ type Collector struct {
 	JwtTokensGenerated  *prometheus.CounterVec
 	ImagesUploaded      prometheus.Counter
 	ImagesDeleted       prometheus.Counter
+	ActiveUsersTotal    prometheus.Gauge
+	CategoriesTotal     prometheus.Gauge
+	SectionsTotal       prometheus.Gauge
+	ProjectsTotal       prometheus.Gauge
 }
 
 func NewCollector() *Collector {
@@ -55,7 +59,7 @@ func NewCollector() *Collector {
 
 		AuthAttempts: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
-				Name: "auth_attempts_total",
+				Name: "authentication_attempts_total",
 				Help: "Total number of authentication attempts",
 			},
 			[]string{"type", "status"}, // login/register, success/failure
@@ -82,6 +86,34 @@ func NewCollector() *Collector {
 				Help: "Total number of images deleted",
 			},
 		),
+
+		ActiveUsersTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "active_users_total",
+				Help: "Total number of active users with portfolios",
+			},
+		),
+
+		CategoriesTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "categories_total",
+				Help: "Total number of categories across all portfolios",
+			},
+		),
+
+		SectionsTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "sections_total",
+				Help: "Total number of sections across all portfolios",
+			},
+		),
+
+		ProjectsTotal: prometheus.NewGauge(
+			prometheus.GaugeOpts{
+				Name: "projects_total",
+				Help: "Total number of projects across all categories",
+			},
+		),
 	}
 
 	collector.registerMetrics()
@@ -98,6 +130,10 @@ func (c *Collector) registerMetrics() {
 		c.JwtTokensGenerated,
 		c.ImagesUploaded,
 		c.ImagesDeleted,
+		c.ActiveUsersTotal,
+		c.CategoriesTotal,
+		c.SectionsTotal,
+		c.ProjectsTotal,
 	)
 }
 
@@ -129,6 +165,22 @@ func (c *Collector) UpdatePortfoliosTotal(count int64) {
 	c.PortfoliosTotal.Set(float64(count))
 }
 
+func (c *Collector) UpdateActiveUsersTotal(count int64) {
+	c.ActiveUsersTotal.Set(float64(count))
+}
+
+func (c *Collector) UpdateCategoriesTotal(count int64) {
+	c.CategoriesTotal.Set(float64(count))
+}
+
+func (c *Collector) UpdateSectionsTotal(count int64) {
+	c.SectionsTotal.Set(float64(count))
+}
+
+func (c *Collector) UpdateProjectsTotal(count int64) {
+	c.ProjectsTotal.Set(float64(count))
+}
+
 func (c *Collector) IncrementAuthAttempts(authType, status string) {
 	c.AuthAttempts.WithLabelValues(authType, status).Inc()
 }
@@ -158,10 +210,33 @@ func (c *Collector) StartMetricsCollection(db *gorm.DB) {
 }
 
 func (c *Collector) collectBusinessMetrics(db *gorm.DB) {
-
 	// Count portfolios
 	var portfolioCount int64
 	if err := db.Table("portfolios").Count(&portfolioCount).Error; err == nil {
 		c.UpdatePortfoliosTotal(portfolioCount)
+	}
+
+	// Count active users (users with at least one portfolio)
+	var userCount int64
+	if err := db.Table("portfolios").Distinct("owner_id").Count(&userCount).Error; err == nil {
+		c.UpdateActiveUsersTotal(userCount)
+	}
+
+	// Count categories
+	var categoryCount int64
+	if err := db.Table("categories").Count(&categoryCount).Error; err == nil {
+		c.UpdateCategoriesTotal(categoryCount)
+	}
+
+	// Count sections
+	var sectionCount int64
+	if err := db.Table("sections").Count(&sectionCount).Error; err == nil {
+		c.UpdateSectionsTotal(sectionCount)
+	}
+
+	// Count projects
+	var projectCount int64
+	if err := db.Table("projects").Count(&projectCount).Error; err == nil {
+		c.UpdateProjectsTotal(projectCount)
 	}
 }

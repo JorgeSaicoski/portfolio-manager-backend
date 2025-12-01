@@ -20,13 +20,24 @@ func (r *portfolioRepository) Create(portfolio *models.Portfolio) error {
 }
 
 // For list views - only basic portfolio info
-func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Portfolio, error) {
+func (r *portfolioRepository) GetByOwnerIDBasic(ownerID string, limit, offset int) ([]models.Portfolio, int64, error) {
 	var portfolios []models.Portfolio
+	var total int64
+
+	// Get total count
+	if err := r.db.Model(&models.Portfolio{}).
+		Where("owner_id = ?", ownerID).
+		Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	// Get paginated results
 	err := r.db.Select("id, title, description, owner_id, created_at, updated_at").
 		Where("owner_id = ?", ownerID).
 		Limit(limit).Offset(offset).
 		Find(&portfolios).Error
-	return portfolios, err
+
+	return portfolios, total, err
 }
 
 // For detail views - with relationships using JOIN
@@ -38,6 +49,15 @@ func (r *portfolioRepository) GetByIDWithRelations(id uint) (*models.Portfolio, 
 		Where("portfolios.id = ?", id).
 		First(&portfolio).Error
 	return &portfolio, err
+}
+
+func (r *portfolioRepository) GetByID(id uint) (*models.Portfolio, error) {
+	var portfolio models.Portfolio
+	err := r.db.First(&portfolio, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &portfolio, nil
 }
 
 func (r *portfolioRepository) GetByIDBasic(id uint) (*models.Portfolio, error) {
@@ -54,7 +74,59 @@ func (r *portfolioRepository) Update(portfolio *models.Portfolio) error {
 }
 
 func (r *portfolioRepository) Delete(id uint) error {
-	return r.db.Delete(&models.Portfolio{}, id).Error
+	// Use a transaction to ensure all cascading deletes succeed or none do
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		// First, get all categories for this portfolio
+		var categoryIDs []uint
+		if err := tx.Model(&models.Category{}).
+			Where("portfolio_id = ?", id).
+			Pluck("id", &categoryIDs).Error; err != nil {
+			return err
+		}
+
+		// Soft delete all projects in those categories
+		if len(categoryIDs) > 0 {
+			if err := tx.Where("category_id IN ?", categoryIDs).
+				Delete(&models.Project{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Soft delete all categories for this portfolio
+		if err := tx.Where("portfolio_id = ?", id).
+			Delete(&models.Category{}).Error; err != nil {
+			return err
+		}
+
+		// Get all sections for this portfolio
+		var sectionIDs []uint
+		if err := tx.Model(&models.Section{}).
+			Where("portfolio_id = ?", id).
+			Pluck("id", &sectionIDs).Error; err != nil {
+			return err
+		}
+
+		// Soft delete all section contents in those sections
+		if len(sectionIDs) > 0 {
+			if err := tx.Where("section_id IN ?", sectionIDs).
+				Delete(&models.SectionContent{}).Error; err != nil {
+				return err
+			}
+		}
+
+		// Soft delete all sections for this portfolio
+		if err := tx.Where("portfolio_id = ?", id).
+			Delete(&models.Section{}).Error; err != nil {
+			return err
+		}
+
+		// Finally, soft delete the portfolio itself
+		if err := tx.Delete(&models.Portfolio{}, id).Error; err != nil {
+			return err
+		}
+
+		return nil
+	})
 }
 
 func (r *portfolioRepository) List(limit, offset int) ([]models.Portfolio, error) {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/infrastructure/audit"
@@ -10,10 +11,12 @@ import (
 )
 
 type UserHandler struct {
-	portfolioRepo repo.PortfolioRepository
-	categoryRepo  repo.CategoryRepository
-	sectionRepo   repo.SectionRepository
-	projectRepo   repo.ProjectRepository
+	portfolioRepo      repo.PortfolioRepository
+	categoryRepo       repo.CategoryRepository
+	sectionRepo        repo.SectionRepository
+	projectRepo        repo.ProjectRepository
+	imageRepo          repo.ImageRepository
+	sectionContentRepo repo.SectionContentRepository
 }
 
 func NewUserHandler(
@@ -21,12 +24,16 @@ func NewUserHandler(
 	categoryRepo repo.CategoryRepository,
 	sectionRepo repo.SectionRepository,
 	projectRepo repo.ProjectRepository,
+	imageRepo repo.ImageRepository,
+	sectionContentRepo repo.SectionContentRepository,
 ) *UserHandler {
 	return &UserHandler{
-		portfolioRepo: portfolioRepo,
-		categoryRepo:  categoryRepo,
-		sectionRepo:   sectionRepo,
-		projectRepo:   projectRepo,
+		portfolioRepo:      portfolioRepo,
+		categoryRepo:       categoryRepo,
+		sectionRepo:        sectionRepo,
+		projectRepo:        projectRepo,
+		imageRepo:          imageRepo,
+		sectionContentRepo: sectionContentRepo,
 	}
 }
 
@@ -56,7 +63,7 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	}).Info("Starting user data cleanup")
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
+	portfolios, _, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "CLEANUP_USER_DATA_DB_ERROR",
@@ -73,9 +80,93 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 	}
 
 	portfolioCount := len(portfolios)
+	var totalImagesDeleted, totalSectionContentDeleted int
 
-	// Delete all portfolios (CASCADE will delete all related data)
+	// Delete all portfolios (CASCADE will delete categories, sections, and projects)
+	// But we need to manually delete images and section contents due to polymorphic associations
 	for _, portfolio := range portfolios {
+		// Get and delete all sections for this portfolio
+		sections, err := h.sectionRepo.GetByPortfolioID(fmt.Sprintf("%d", portfolio.ID))
+		if err == nil {
+			for _, section := range sections {
+				// Delete section content (not covered by CASCADE due to owner_id check)
+				sectionContents, err := h.sectionContentRepo.GetBySectionID(section.ID)
+				if err == nil {
+					for _, content := range sectionContents {
+						if err := h.sectionContentRepo.Delete(content.ID); err != nil {
+							logrus.WithFields(logrus.Fields{
+								"userID":    userID,
+								"contentID": content.ID,
+								"error":     err.Error(),
+							}).Warn("Failed to delete section content during cleanup")
+						} else {
+							totalSectionContentDeleted++
+						}
+					}
+				}
+
+				// Delete images associated with sections (polymorphic, not covered by CASCADE)
+				sectionImages, err := h.imageRepo.GetByEntity("section", section.ID)
+				if err == nil {
+					for _, img := range sectionImages {
+						if err := h.imageRepo.Delete(img.ID); err != nil {
+							logrus.WithFields(logrus.Fields{
+								"userID":  userID,
+								"imageID": img.ID,
+								"error":   err.Error(),
+							}).Warn("Failed to delete section image during cleanup")
+						} else {
+							totalImagesDeleted++
+						}
+					}
+				}
+			}
+		}
+
+		// Get and delete all categories and their projects
+		categories, err := h.categoryRepo.GetByPortfolioID(fmt.Sprintf("%d", portfolio.ID))
+		if err == nil {
+			for _, category := range categories {
+				projects, err := h.projectRepo.GetByCategoryID(fmt.Sprintf("%d", category.ID))
+				if err == nil {
+					for _, project := range projects {
+						// Delete images associated with projects (polymorphic, not covered by CASCADE)
+						projectImages, err := h.imageRepo.GetByEntity("project", project.ID)
+						if err == nil {
+							for _, img := range projectImages {
+								if err := h.imageRepo.Delete(img.ID); err != nil {
+									logrus.WithFields(logrus.Fields{
+										"userID":  userID,
+										"imageID": img.ID,
+										"error":   err.Error(),
+									}).Warn("Failed to delete project image during cleanup")
+								} else {
+									totalImagesDeleted++
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		// Delete images associated with portfolios (polymorphic, not covered by CASCADE)
+		portfolioImages, err := h.imageRepo.GetByEntity("portfolio", portfolio.ID)
+		if err == nil {
+			for _, img := range portfolioImages {
+				if err := h.imageRepo.Delete(img.ID); err != nil {
+					logrus.WithFields(logrus.Fields{
+						"userID":  userID,
+						"imageID": img.ID,
+						"error":   err.Error(),
+					}).Warn("Failed to delete portfolio image during cleanup")
+				} else {
+					totalImagesDeleted++
+				}
+			}
+		}
+
+		// Now delete the portfolio (CASCADE will handle categories, sections, and projects)
 		if err := h.portfolioRepo.Delete(portfolio.ID); err != nil {
 			audit.GetErrorLogger().WithFields(logrus.Fields{
 				"operation":   "CLEANUP_USER_DATA_DELETE_ERROR",
@@ -96,17 +187,21 @@ func (h *UserHandler) CleanupUserData(c *gin.Context) {
 			"userID":      userID,
 			"portfolioID": portfolio.ID,
 			"title":       portfolio.Title,
-		}).Info("Portfolio deleted as part of user cleanup (CASCADE: all related data)")
+		}).Info("Portfolio deleted as part of user cleanup (CASCADE: categories, sections, projects)")
 	}
 
 	logrus.WithFields(logrus.Fields{
-		"userID":         userID,
-		"portfolioCount": portfolioCount,
+		"userID":                userID,
+		"portfolioCount":        portfolioCount,
+		"imagesDeleted":         totalImagesDeleted,
+		"sectionContentDeleted": totalSectionContentDeleted,
 	}).Info("User data cleanup completed successfully")
 
 	c.JSON(http.StatusOK, gin.H{
-		"message":           "User data cleaned up successfully",
-		"portfoliosDeleted": portfolioCount,
+		"message":               "User data cleaned up successfully",
+		"portfoliosDeleted":     portfolioCount,
+		"imagesDeleted":         totalImagesDeleted,
+		"sectionContentDeleted": totalSectionContentDeleted,
 	})
 }
 
@@ -128,7 +223,7 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	}
 
 	// Get all portfolios for this user
-	portfolios, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
+	portfolios, _, err := h.portfolioRepo.GetByOwnerIDBasic(userID, 1000, 0)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_USER_DATA_SUMMARY_DB_ERROR",
@@ -147,20 +242,20 @@ func (h *UserHandler) GetUserDataSummary(c *gin.Context) {
 	var totalCategories, totalSections, totalProjects int
 
 	for _, portfolio := range portfolios {
-		categories, err := h.categoryRepo.GetByPortfolioID(string(rune(portfolio.ID)))
+		categories, err := h.categoryRepo.GetByPortfolioID(fmt.Sprintf("%d", portfolio.ID))
 		if err == nil {
 			totalCategories += len(categories)
 
 			// Count projects in each category
 			for _, category := range categories {
-				projects, err := h.projectRepo.GetByCategoryID(string(rune(category.ID)))
+				projects, err := h.projectRepo.GetByCategoryID(fmt.Sprintf("%d", category.ID))
 				if err == nil {
 					totalProjects += len(projects)
 				}
 			}
 		}
 
-		sections, err := h.sectionRepo.GetByPortfolioID(string(rune(portfolio.ID)))
+		sections, err := h.sectionRepo.GetByPortfolioID(fmt.Sprintf("%d", portfolio.ID))
 		if err == nil {
 			totalSections += len(sections)
 		}

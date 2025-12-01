@@ -22,6 +22,13 @@ type SectionHandler struct {
 	metrics       *metrics.Collector
 }
 
+type SectionBulkReorderRequest struct {
+	Items []struct {
+		ID       uint `json:"id" binding:"required"`
+		Position uint `json:"position" binding:"required,min=1"`
+	} `json:"items" binding:"required,min=1"`
+}
+
 func NewSectionHandler(repo repo.SectionRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *SectionHandler {
 	return &SectionHandler{
 		repo:          repo,
@@ -49,7 +56,7 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	sections, err := h.repo.GetByOwnerID(userID, limit, offset)
+	sections, total, err := h.repo.GetByOwnerID(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_SECTIONS_BY_USER_DB_ERROR",
@@ -62,7 +69,7 @@ func (h *SectionHandler) GetByUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithPagination(c, 200, "sections", sections, page, limit)
+	response.SuccessWithPagination(c, 200, "sections", sections, page, limit, total)
 }
 
 func (h *SectionHandler) GetByPortfolio(c *gin.Context) {
@@ -619,6 +626,9 @@ func (h *SectionHandler) UpdatePosition(c *gin.Context) {
 		return
 	}
 
+	// Store old position before update
+	oldPosition := existing.Position
+
 	// Update position
 	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
@@ -634,5 +644,101 @@ func (h *SectionHandler) UpdatePosition(c *gin.Context) {
 		return
 	}
 
+	// Audit log successful update
+	audit.GetUpdateLogger().WithFields(logrus.Fields{
+		"operation":   "UPDATE_SECTION_POSITION",
+		"sectionID":   id,
+		"oldPosition": oldPosition,
+		"newPosition": req.Position,
+		"userID":      userID,
+	}).Info("Section position updated successfully")
+
 	response.OK(c, "message", "Section position updated successfully", "Success")
+}
+
+// BulkReorder handles reordering multiple sections atomically
+func (h *SectionHandler) BulkReorder(c *gin.Context) {
+	// Get user ID
+	userID := c.GetString("userID") // From auth middleware
+
+	// Parse request
+	var req SectionBulkReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	// Validate no duplicate positions
+	positionMap := make(map[uint]bool)
+	for _, item := range req.Items {
+		if positionMap[item.Position] {
+			response.BadRequest(c, fmt.Sprintf("Duplicate position: %d", item.Position))
+			return
+		}
+		positionMap[item.Position] = true
+	}
+
+	// Verify all sections belong to user's portfolios
+	sectionIDs := make([]uint, len(req.Items))
+	for i, item := range req.Items {
+		sectionIDs[i] = item.ID
+	}
+
+	sections, err := h.repo.GetByIDs(sectionIDs)
+	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "BULK_REORDER_SECTIONS",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to fetch sections for bulk reorder")
+		response.InternalError(c, "Failed to fetch sections")
+		return
+	}
+
+	if len(sections) != len(req.Items) {
+		response.NotFound(c, "Some sections not found")
+		return
+	}
+
+	// Verify ownership
+	for _, sec := range sections {
+		portfolio, err := h.portfolioRepo.GetByID(sec.PortfolioID)
+		if err != nil || portfolio.OwnerID != userID {
+			response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+				"resource_type": "section",
+				"resource_id":   sec.ID,
+			})
+			return
+		}
+	}
+
+	// Update positions in transaction
+	if err := h.repo.BulkUpdatePositions(req.Items); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "BULK_REORDER_SECTIONS",
+			"userID":    userID,
+			"itemCount": len(req.Items),
+			"error":     err.Error(),
+		}).Error("Failed to bulk update section positions")
+		response.InternalError(c, "Failed to update positions")
+		return
+	}
+
+	// Audit log successful reorder
+	itemDetails := make([]map[string]uint, len(req.Items))
+	for i, item := range req.Items {
+		itemDetails[i] = map[string]uint{
+			"id":       item.ID,
+			"position": item.Position,
+		}
+	}
+
+	audit.GetUpdateLogger().WithFields(logrus.Fields{
+		"operation": "BULK_REORDER_SECTIONS",
+		"userID":    userID,
+		"itemCount": len(req.Items),
+		"items":     itemDetails,
+	}).Info("Sections reordered successfully")
+
+	response.OK(c, "message", "Sections reordered successfully", "Success")
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -19,6 +20,13 @@ type CategoryHandler struct {
 	repo          repo.CategoryRepository
 	portfolioRepo repo.PortfolioRepository
 	metrics       *metrics.Collector
+}
+
+type BulkReorderRequest struct {
+	Items []struct {
+		ID       uint `json:"id" binding:"required"`
+		Position uint `json:"position" binding:"required,min=1"`
+	} `json:"items" binding:"required,min=1"`
 }
 
 func NewCategoryHandler(repo repo.CategoryRepository, portfolioRepo repo.PortfolioRepository, metrics *metrics.Collector) *CategoryHandler {
@@ -49,7 +57,7 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 
 	offset := (page - 1) * limit
 
-	categories, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
+	categories, total, err := h.repo.GetByOwnerIDBasic(userID, limit, offset)
 	if err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
 			"operation": "GET_CATEGORIES_BY_USER_DB_ERROR",
@@ -62,7 +70,7 @@ func (h *CategoryHandler) GetByUser(c *gin.Context) {
 		return
 	}
 
-	response.SuccessWithPagination(c, http.StatusOK, "categories", categories, page, limit)
+	response.SuccessWithPagination(c, http.StatusOK, "categories", categories, page, limit, total)
 }
 func (h *CategoryHandler) Update(c *gin.Context) {
 	userID := c.GetString("userID") // From auth middleware
@@ -482,6 +490,9 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 		return
 	}
 
+	// Store old position before update
+	oldPosition := existing.Position
+
 	// Update position
 	if err := h.repo.UpdatePosition(uint(id), req.Position); err != nil {
 		audit.GetErrorLogger().WithFields(logrus.Fields{
@@ -497,5 +508,101 @@ func (h *CategoryHandler) UpdatePosition(c *gin.Context) {
 		return
 	}
 
+	// Audit log successful update
+	audit.GetUpdateLogger().WithFields(logrus.Fields{
+		"operation":   "UPDATE_CATEGORY_POSITION",
+		"categoryID":  id,
+		"oldPosition": oldPosition,
+		"newPosition": req.Position,
+		"userID":      userID,
+	}).Info("Category position updated successfully")
+
 	response.OK(c, "message", "Category position updated successfully", "Success")
+}
+
+// BulkReorder handles reordering multiple categories atomically
+func (h *CategoryHandler) BulkReorder(c *gin.Context) {
+	// Get user ID
+	userID := c.GetString("userID") // From auth middleware
+
+	// Parse request
+	var req BulkReorderRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.BadRequest(c, "Invalid request: "+err.Error())
+		return
+	}
+
+	// Validate no duplicate positions
+	positionMap := make(map[uint]bool)
+	for _, item := range req.Items {
+		if positionMap[item.Position] {
+			response.BadRequest(c, fmt.Sprintf("Duplicate position: %d", item.Position))
+			return
+		}
+		positionMap[item.Position] = true
+	}
+
+	// Verify all categories belong to user's portfolios
+	categoryIDs := make([]uint, len(req.Items))
+	for i, item := range req.Items {
+		categoryIDs[i] = item.ID
+	}
+
+	categories, err := h.repo.GetByIDs(categoryIDs)
+	if err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "BULK_REORDER_CATEGORIES",
+			"userID":    userID,
+			"error":     err.Error(),
+		}).Error("Failed to fetch categories for bulk reorder")
+		response.InternalError(c, "Failed to fetch categories")
+		return
+	}
+
+	if len(categories) != len(req.Items) {
+		response.NotFound(c, "Some categories not found")
+		return
+	}
+
+	// Verify ownership
+	for _, cat := range categories {
+		portfolio, err := h.portfolioRepo.GetByID(cat.PortfolioID)
+		if err != nil || portfolio.OwnerID != userID {
+			response.ForbiddenWithDetails(c, "Access denied", map[string]interface{}{
+				"resource_type": "category",
+				"resource_id":   cat.ID,
+			})
+			return
+		}
+	}
+
+	// Update positions in transaction
+	if err := h.repo.BulkUpdatePositions(req.Items); err != nil {
+		audit.GetErrorLogger().WithFields(logrus.Fields{
+			"operation": "BULK_REORDER_CATEGORIES",
+			"userID":    userID,
+			"itemCount": len(req.Items),
+			"error":     err.Error(),
+		}).Error("Failed to bulk update category positions")
+		response.InternalError(c, "Failed to update positions")
+		return
+	}
+
+	// Audit log successful reorder
+	itemDetails := make([]map[string]uint, len(req.Items))
+	for i, item := range req.Items {
+		itemDetails[i] = map[string]uint{
+			"id":       item.ID,
+			"position": item.Position,
+		}
+	}
+
+	audit.GetUpdateLogger().WithFields(logrus.Fields{
+		"operation": "BULK_REORDER_CATEGORIES",
+		"userID":    userID,
+		"itemCount": len(req.Items),
+		"items":     itemDetails,
+	}).Info("Categories reordered successfully")
+
+	response.OK(c, "message", "Categories reordered successfully", "Success")
 }
