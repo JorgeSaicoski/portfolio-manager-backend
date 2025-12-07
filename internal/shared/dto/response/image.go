@@ -1,6 +1,7 @@
 package response
 
 import (
+	"strings"
 	"time"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
@@ -25,10 +26,21 @@ type ImageResponse struct {
 
 // ToImageResponse converts a models.Image to ImageResponse
 func ToImageResponse(image *models.Image) ImageResponse {
+	url := image.URL
+	thumbnailURL := image.ThumbnailURL
+
+	// Normalize URLs to ensure leading slash
+	if url != "" && !strings.HasPrefix(url, "/") && !strings.HasPrefix(url, "http") {
+		url = "/" + url
+	}
+	if thumbnailURL != "" && !strings.HasPrefix(thumbnailURL, "/") && !strings.HasPrefix(thumbnailURL, "http") {
+		thumbnailURL = "/" + thumbnailURL
+	}
+
 	return ImageResponse{
 		ID:           image.ID,
-		URL:          image.URL,
-		ThumbnailURL: image.ThumbnailURL,
+		URL:          url,
+		ThumbnailURL: thumbnailURL,
 		FileName:     image.FileName,
 		FileSize:     image.FileSize,
 		MimeType:     image.MimeType,
