@@ -128,22 +128,19 @@ func TestUser_CleanupUserData(t *testing.T) {
 		// Create comprehensive test data
 		portfolio := CreateTestPortfolio(testDB.DB, userID)
 		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
-		project := CreateTestProject(testDB.DB, category.ID, userID)
-		CreateTestImage(testDB.DB, project.ID, "project", userID)
+		_ = CreateTestProject(testDB.DB, category.ID, userID)
 
 		// Get counts before deletion
-		var portfolioCount, categoryCount, sectionCount, projectCount, imageCount int64
+		var portfolioCount, categoryCount, sectionCount, projectCount int64
 		testDB.DB.Model(&models2.Portfolio{}).Where("owner_id = ?", userID).Count(&portfolioCount)
 		testDB.DB.Model(&models2.Category{}).Where("owner_id = ?", userID).Count(&categoryCount)
 		testDB.DB.Model(&models2.Section{}).Where("owner_id = ?", userID).Count(&sectionCount)
 		testDB.DB.Model(&models2.Project{}).Where("owner_id = ?", userID).Count(&projectCount)
-		testDB.DB.Model(&models2.Image{}).Where("owner_id = ?", userID).Count(&imageCount)
 
 		assert.Equal(t, int64(1), portfolioCount)
 		assert.Equal(t, int64(1), categoryCount)
 		assert.Equal(t, int64(0), sectionCount) // No section created in this test
 		assert.Equal(t, int64(1), projectCount)
-		assert.Equal(t, int64(1), imageCount)
 
 		// Execute cleanup
 		resp := MakeRequest(t, "DELETE", "/api/users/me/data", nil, token)
@@ -158,13 +155,11 @@ func TestUser_CleanupUserData(t *testing.T) {
 		testDB.DB.Model(&models2.Category{}).Where("owner_id = ?", userID).Count(&categoryCount)
 		testDB.DB.Model(&models2.Section{}).Where("owner_id = ?", userID).Count(&sectionCount)
 		testDB.DB.Model(&models2.Project{}).Where("owner_id = ?", userID).Count(&projectCount)
-		testDB.DB.Model(&models2.Image{}).Where("owner_id = ?", userID).Count(&imageCount)
 
 		assert.Equal(t, int64(0), portfolioCount, "Portfolios should be deleted")
 		assert.Equal(t, int64(0), categoryCount, "Categories should be cascade deleted")
 		assert.Equal(t, int64(0), sectionCount, "Sections should be cascade deleted")
 		assert.Equal(t, int64(0), projectCount, "Projects should be cascade deleted")
-		assert.Equal(t, int64(0), imageCount, "Images should be cascade deleted")
 
 		cleanDatabase(testDB.DB)
 	})

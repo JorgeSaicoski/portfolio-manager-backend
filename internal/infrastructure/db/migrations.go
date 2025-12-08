@@ -642,6 +642,57 @@ func MigrateProjectImages(db *gorm.DB) error {
 	return nil
 }
 
+// FixImageURLPaths fixes image URLs that are missing leading slashes
+func FixImageURLPaths(db *gorm.DB) error {
+	log.Println("Starting image URL path fix migration...")
+
+	type ImageURL struct {
+		ID           uint
+		URL          string
+		ThumbnailURL string
+	}
+
+	var images []ImageURL
+
+	// Query images where URL doesn't start with "/"
+	if err := db.Table("images").
+		Select("id, url, thumbnail_url").
+		Where("url NOT LIKE '/%' OR thumbnail_url NOT LIKE '/%'").
+		Find(&images).Error; err != nil {
+		log.Printf("Warning: failed to query images for URL fix: %v", err)
+		return nil
+	}
+
+	if len(images) == 0 {
+		log.Println("No malformed image URLs found, migration not needed")
+		return nil
+	}
+
+	fixedCount := 0
+
+	for _, img := range images {
+		updates := make(map[string]interface{})
+
+		if !strings.HasPrefix(img.URL, "/") {
+			updates["url"] = "/" + img.URL
+		}
+		if !strings.HasPrefix(img.ThumbnailURL, "/") {
+			updates["thumbnail_url"] = "/" + img.ThumbnailURL
+		}
+
+		if len(updates) > 0 {
+			if err := db.Table("images").Where("id = ?", img.ID).Updates(updates).Error; err != nil {
+				log.Printf("Error fixing image %d: %v", img.ID, err)
+			} else {
+				fixedCount++
+			}
+		}
+	}
+
+	log.Printf("Image URL path fix completed: %d images fixed", fixedCount)
+	return nil
+}
+
 // extractFilename extracts filename from URL
 func extractFilename(url string) string {
 	parts := strings.Split(url, "/")

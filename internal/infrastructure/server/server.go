@@ -124,9 +124,6 @@ func (s *Server) setupRoutes() {
 		s.logger.Warn("Metrics endpoint is unprotected - set PROMETHEUS_AUTH_USER and PROMETHEUS_AUTH_PASSWORD")
 	}
 
-	// Static file serving for uploaded images
-	s.router.RegisterStaticRoutes(s.engine)
-
 	// API group
 	api := s.engine.Group("/api")
 	s.router.RegisterPortfolioRoutes(api)
@@ -134,7 +131,6 @@ func (s *Server) setupRoutes() {
 	s.router.RegisterProjectRoutes(api)
 	s.router.RegisterSectionRoutes(api)
 	s.router.RegisterSectionContentRoutes(api)
-	s.router.RegisterImageRoutes(api)
 	s.router.RegisterUserRoutes(api)
 }
 

@@ -27,7 +27,6 @@ func main() {
 	categoryRepo := repo.NewCategoryRepository(database.DB)
 	sectionRepo := repo.NewSectionRepository(database.DB)
 	projectRepo := repo.NewProjectRepository(database.DB)
-	imageRepo := repo.NewImageRepository(database.DB)
 	sectionContentRepo := repo.NewSectionContentRepository(database.DB)
 
 	// Initialize handler - this will fail to compile if signature is wrong
@@ -36,7 +35,6 @@ func main() {
 		categoryRepo,
 		sectionRepo,
 		projectRepo,
-		imageRepo,
 		sectionContentRepo,
 	)
 
