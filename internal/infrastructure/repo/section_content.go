@@ -22,7 +22,8 @@ func (r *sectionContentRepository) Create(content *models.SectionContent) error 
 // GetByID retrieves a single content block by ID
 func (r *sectionContentRepository) GetByID(id uint) (*models.SectionContent, error) {
 	var content models.SectionContent
-	err := r.db.Where("id = ?", id).
+	err := r.db.Select("id, section_id, type, content, \"order\", metadata, owner_id, created_at, updated_at").
+		Where("id = ?", id).
 		First(&content).Error
 	return &content, err
 }
@@ -30,7 +31,8 @@ func (r *sectionContentRepository) GetByID(id uint) (*models.SectionContent, err
 // GetBySectionID retrieves all content blocks for a section, ordered by position
 func (r *sectionContentRepository) GetBySectionID(sectionID uint) ([]models.SectionContent, error) {
 	var contents []models.SectionContent
-	err := r.db.Where("section_id = ?", sectionID).
+	err := r.db.Select("id, section_id, type, content, \"order\", metadata, owner_id, created_at, updated_at").
+		Where("section_id = ?", sectionID).
 		Order("\"order\" ASC, created_at ASC").
 		Find(&contents).Error
 	return contents, err

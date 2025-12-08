@@ -47,7 +47,8 @@ func (r *sectionRepository) GetByOwnerID(ownerID string, limit, offset int) ([]m
 // GetByID For detail views - basic section info
 func (r *sectionRepository) GetByID(id uint) (*models.Section, error) {
 	var section models.Section
-	err := r.db.Where("id = ?", id).
+	err := r.db.Select("id, title, position, owner_id, portfolio_id, created_at, updated_at").
+		Where("id = ?", id).
 		First(&section).Error
 	return &section, err
 }
