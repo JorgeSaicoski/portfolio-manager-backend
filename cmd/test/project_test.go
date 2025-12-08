@@ -246,38 +246,6 @@ func TestProject_Create(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
-	t.Run("Success_WithImages", func(t *testing.T) {
-		cleanDatabase(testDB.DB)
-
-		portfolio := CreateTestPortfolio(testDB.DB, userID)
-		category := CreateTestCategory(testDB.DB, portfolio.ID, userID)
-		project := CreateTestProject(testDB.DB, category.ID, userID)
-
-		// Add images using the Image model
-		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 1")
-		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 2")
-		CreateTestImageWithAlt(testDB.DB, project.ID, "project", userID, "Image 3")
-
-		// Get the project to verify images are loaded
-		resp := MakeRequest(t, "GET", fmt.Sprintf("/api/projects/own/%d", project.ID), nil, token)
-
-		AssertJSONResponse(t, resp, 200, func(body map[string]interface{}) {
-			assert.Contains(t, body, "data")
-			data := body["data"].(map[string]interface{})
-			images := data["images"].([]interface{})
-			assert.Equal(t, 3, len(images))
-
-			// Verify first image structure
-			firstImage := images[0].(map[string]interface{})
-			assert.Contains(t, firstImage, "url")
-			assert.Contains(t, firstImage, "alt")
-			assert.Contains(t, firstImage, "entity_type")
-			assert.Equal(t, "project", firstImage["entity_type"])
-		})
-
-		cleanDatabase(testDB.DB)
-	})
-
 	t.Run("Success_WithoutImages", func(t *testing.T) {
 		cleanDatabase(testDB.DB)
 

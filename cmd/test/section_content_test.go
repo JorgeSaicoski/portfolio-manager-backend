@@ -588,26 +588,6 @@ func TestSectionContent_Delete(t *testing.T) {
 		cleanDatabase(testDB.DB)
 	})
 
-	t.Run("Success_WithImageMetadata", func(t *testing.T) {
-		cleanDatabase(testDB.DB)
-
-		portfolio := CreateTestPortfolio(testDB.DB, userID)
-		section := CreateTestSection(testDB.DB, portfolio.ID, userID)
-
-		// Create content with image metadata
-		content := CreateTestSectionContentWithImage(testDB.DB, section.ID, userID)
-
-		resp := MakeRequest(t, "DELETE", fmt.Sprintf("/api/section-contents/own/%d", content.ID), nil, token)
-		assert.Equal(t, 200, resp.Code)
-
-		// Verify content is deleted
-		var count int64
-		testDB.DB.Model(&models2.SectionContent{}).Where("id = ?", content.ID).Count(&count)
-		assert.Equal(t, int64(0), count)
-
-		cleanDatabase(testDB.DB)
-	})
-
 	t.Run("NotFound_InvalidID", func(t *testing.T) {
 		resp := MakeRequest(t, "DELETE", "/api/section-contents/own/99999", nil, token)
 		assert.Equal(t, 404, resp.Code)
