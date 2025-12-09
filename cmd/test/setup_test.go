@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -160,9 +160,9 @@ func cleanDatabaseWithError(db *gorm.DB) error {
 	}
 
 	// Truncate all tables in proper order (children before parents)
+	// Note: "images" table has been removed via RemoveImageFeature migration
 	tables := []string{
 		"section_contents",
-		"images",
 		"projects",
 		"categories",
 		"sections",
@@ -170,9 +170,19 @@ func cleanDatabaseWithError(db *gorm.DB) error {
 	}
 
 	for _, table := range tables {
-		if err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error; err != nil {
-			// Re-enable foreign key checks before returning error
-			db.Exec("SET session_replication_role = 'origin'")
+		query := fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)
+		if err := db.Exec(query).Error; err != nil {
+			// If the table doesn't exist, log and continue (useful when images were removed)
+			if err != nil && (strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "42P01")) {
+				fmt.Printf("Note: table %s does not exist, skipping\n", table)
+				continue
+			}
+
+			// Attempt to re-enable foreign key checks before returning error
+			retryErr := db.Exec("SET session_replication_role = 'origin'").Error
+			if retryErr != nil {
+				fmt.Printf("Warning: failed to re-enable foreign key checks: %v\n", retryErr)
+			}
 			return fmt.Errorf("failed to truncate table %s: %w", table, err)
 		}
 	}
@@ -183,29 +193,6 @@ func cleanDatabaseWithError(db *gorm.DB) error {
 	}
 
 	return nil
-}
-
-// Helper to run tests in a transaction (for isolation)
-func runInTransaction(t *testing.T, fn func(tx *gorm.DB)) {
-	tx := testDB.DB.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-			t.Fatalf("Test panicked: %v", r)
-		}
-	}()
-
-	fn(tx)
-
-	// Always rollback to keep tests isolated
-	tx.Rollback()
-}
-
-func getEnvOrDefault(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
 }
 
 // waitForServer polls the health endpoint until the server is ready
@@ -224,14 +211,4 @@ func waitForServer(baseURL string, maxAttempts int) error {
 		}
 	}
 	return fmt.Errorf("server did not become ready after %d attempts", maxAttempts)
-}
-
-// NewTestRecorder creates a new httptest.ResponseRecorder with proper setup
-func NewTestRecorder() *httptest.ResponseRecorder {
-	return httptest.NewRecorder()
-}
-
-// PrintTestSeparator prints a visual separator in test output
-func PrintTestSeparator(testName string) {
-	fmt.Printf("\n=== Running: %s ===\n", testName)
 }

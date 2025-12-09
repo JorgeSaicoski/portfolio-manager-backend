@@ -27,7 +27,6 @@ func (r *projectRepository) Create(project *models.Project) error {
 func (r *projectRepository) GetByID(id uint) (*models.Project, error) {
 	var project models.Project
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Where("id = ?", id).
 		First(&project).Error
 	return &project, err
@@ -47,7 +46,6 @@ func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int)
 
 	// Get paginated results
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Where("owner_id = ?", ownerID).
 		Order("position ASC, created_at ASC").
 		Limit(limit).Offset(offset).
@@ -60,7 +58,6 @@ func (r *projectRepository) GetByOwnerIDBasic(ownerID string, limit, offset int)
 func (r *projectRepository) GetByCategoryID(categoryID string) ([]models.Project, error) {
 	var projects []models.Project
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Where("category_id = ?", categoryID).
 		Order("position ASC, created_at ASC").
 		Find(&projects).Error
@@ -83,7 +80,6 @@ func (r *projectRepository) Delete(id uint) error {
 func (r *projectRepository) List(limit, offset int) ([]models.Project, error) {
 	var projects []models.Project
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Limit(limit).Offset(offset).
 		Find(&projects).Error
 	return projects, err
@@ -93,7 +89,6 @@ func (r *projectRepository) List(limit, offset int) ([]models.Project, error) {
 func (r *projectRepository) GetBySkills(skills []string) ([]models.Project, error) {
 	var projects []models.Project
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Where("skills && ?", skills).
 		Find(&projects).Error
 	return projects, err
@@ -103,7 +98,6 @@ func (r *projectRepository) GetBySkills(skills []string) ([]models.Project, erro
 func (r *projectRepository) GetByClient(client string) ([]models.Project, error) {
 	var projects []models.Project
 	err := r.db.Select("id, title, description, skills, client, link, position, owner_id, category_id, created_at, updated_at").
-		Preload("Images").
 		Where("client = ?", client).
 		Find(&projects).Error
 	return projects, err

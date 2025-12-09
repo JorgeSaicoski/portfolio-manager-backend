@@ -105,43 +105,6 @@ func CreateTestSectionWithTitle(db *gorm.DB, portfolioID uint, ownerID string, t
 	return section
 }
 
-// Image fixtures
-func CreateTestImage(db *gorm.DB, entityID uint, entityType string, ownerID string) *models2.Image {
-	image := &models2.Image{
-		URL:          "/uploads/images/original/test.png",
-		ThumbnailURL: "/uploads/images/thumbnail/test.png",
-		FileName:     "test.png",
-		FileSize:     1024,
-		MimeType:     "image/png",
-		Alt:          "Test image",
-		OwnerID:      ownerID,
-		Type:         "image",
-		EntityID:     entityID,
-		EntityType:   entityType,
-		IsMain:       false,
-	}
-	db.Create(image)
-	return image
-}
-
-func CreateTestImageWithAlt(db *gorm.DB, entityID uint, entityType string, ownerID string, alt string) *models2.Image {
-	image := &models2.Image{
-		URL:          "/uploads/images/original/test.png",
-		ThumbnailURL: "/uploads/images/thumbnail/test.png",
-		FileName:     "test.png",
-		FileSize:     1024,
-		MimeType:     "image/png",
-		Alt:          alt,
-		OwnerID:      ownerID,
-		Type:         "image",
-		EntityID:     entityID,
-		EntityType:   entityType,
-		IsMain:       false,
-	}
-	db.Create(image)
-	return image
-}
-
 // SectionContent fixtures
 func CreateTestSectionContent(db *gorm.DB, sectionID uint, ownerID string) *models2.SectionContent {
 	content := &models2.SectionContent{
@@ -161,23 +124,6 @@ func CreateTestSectionContentWithOrder(db *gorm.DB, sectionID uint, ownerID stri
 		Type:      "text",
 		Content:   fmt.Sprintf("Content order %d", order),
 		Order:     order,
-		OwnerID:   ownerID,
-	}
-	db.Create(content)
-	return content
-}
-
-func CreateTestSectionContentWithImage(db *gorm.DB, sectionID uint, ownerID string) *models2.SectionContent {
-	// Create an image first
-	image := CreateTestImage(db, sectionID, "section", ownerID)
-
-	metadata := fmt.Sprintf(`{"image_id": %d}`, image.ID)
-	content := &models2.SectionContent{
-		SectionID: sectionID,
-		Type:      "image",
-		Content:   "Image description",
-		Order:     0,
-		Metadata:  &metadata,
 		OwnerID:   ownerID,
 	}
 	db.Create(content)

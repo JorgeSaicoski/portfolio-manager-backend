@@ -2,6 +2,8 @@ package validator
 
 import (
 	"fmt"
+	"net/url"
+	"strings"
 
 	models2 "github.com/JorgeSaicoski/portfolio-manager/backend/internal/application/models"
 )
@@ -40,6 +42,42 @@ func ValidateStringLength(value, fieldName string, min, max int) error {
 	return nil
 }
 
+// ValidateURL validates that a URL has a safe scheme (http or https only)
+func ValidateURL(urlStr, fieldName string) error {
+	if urlStr == "" {
+		// Empty URL is allowed (optional field)
+		return nil
+	}
+
+	// Parse the URL
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return ValidationError{
+			Field:   fieldName,
+			Message: fmt.Sprintf("%s must be a valid URL", fieldName),
+		}
+	}
+
+	// Ensure URL has a scheme
+	if parsedURL.Scheme == "" {
+		return ValidationError{
+			Field:   fieldName,
+			Message: fmt.Sprintf("%s must include a scheme (http:// or https://)", fieldName),
+		}
+	}
+
+	// Only allow http and https schemes to prevent XSS attacks
+	scheme := strings.ToLower(parsedURL.Scheme)
+	if scheme != "http" && scheme != "https" {
+		return ValidationError{
+			Field:   fieldName,
+			Message: fmt.Sprintf("%s must use http:// or https:// scheme", fieldName),
+		}
+	}
+
+	return nil
+}
+
 // ValidateProject validates all project fields
 func ValidateProject(project *models2.Project) error {
 	// Validate title
@@ -60,8 +98,13 @@ func ValidateProject(project *models2.Project) error {
 		}
 	}
 
+	// Validate link URL if provided
+	if err := ValidateURL(project.Link, "Link"); err != nil {
+		return err
+	}
+
 	// Add more validations as needed
-	// For example: link format, client name, etc.
+	// For example: client name, etc.
 
 	return nil
 }

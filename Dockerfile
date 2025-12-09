@@ -34,8 +34,8 @@ COPY --from=builder /app/backend-service .
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
-# Create audit and uploads directories with correct permissions
-RUN mkdir -p /app/audit /app/uploads/images/original /app/uploads/images/thumbnail && \
+# Create audit directory with correct permissions
+RUN mkdir -p /app/audit && \
     chown -R appuser:appgroup /app
 
 # Switch to non-root user
