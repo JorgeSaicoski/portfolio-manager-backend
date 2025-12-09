@@ -61,40 +61,6 @@ func MakeRequest(t *testing.T, method, path string, body interface{}, token stri
 	return recorder
 }
 
-// ExecuteRequest executes a raw HTTP request (useful for multipart/form-data)
-func ExecuteRequest(req *http.Request) *httptest.ResponseRecorder {
-	// Update the URL to include the base URL
-	baseURL := getBaseURL()
-	req.URL.Host = ""
-	req.URL.Scheme = ""
-	fullURL := fmt.Sprintf("%s%s", baseURL, req.URL.Path)
-	newReq, _ := http.NewRequest(req.Method, fullURL, req.Body)
-
-	// Copy headers
-	for key, values := range req.Header {
-		for _, value := range values {
-			newReq.Header.Add(key, value)
-		}
-	}
-
-	client := &http.Client{}
-	resp, _ := client.Do(newReq)
-	defer resp.Body.Close()
-
-	// Convert to httptest.ResponseRecorder
-	recorder := httptest.NewRecorder()
-	bodyBytes, _ := io.ReadAll(resp.Body)
-	recorder.Body.Write(bodyBytes)
-	recorder.Code = resp.StatusCode
-	for key, values := range resp.Header {
-		for _, value := range values {
-			recorder.Header().Add(key, value)
-		}
-	}
-
-	return recorder
-}
-
 // AssertJSONResponse checks if response matches expected JSON
 func AssertJSONResponse(t *testing.T, recorder *httptest.ResponseRecorder, expectedCode int, checkFunc func(map[string]interface{})) {
 	assert.Equal(t, expectedCode, recorder.Code)
