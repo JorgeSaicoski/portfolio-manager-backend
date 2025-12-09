@@ -19,5 +19,5 @@ type UpdateSectionContentRequest struct {
 
 // UpdateSectionContentOrderRequest represents the request body for updating just the order
 type UpdateSectionContentOrderRequest struct {
-	Order uint `json:"order" binding:"required"`
+	Order uint `json:"order"`
 }
