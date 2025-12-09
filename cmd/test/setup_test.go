@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -170,9 +171,19 @@ func cleanDatabaseWithError(db *gorm.DB) error {
 	}
 
 	for _, table := range tables {
-		if err := db.Exec(fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)).Error; err != nil {
-			// Re-enable foreign key checks before returning error
-			db.Exec("SET session_replication_role = 'origin'")
+		query := fmt.Sprintf("TRUNCATE TABLE %s CASCADE", table)
+		if err := db.Exec(query).Error; err != nil {
+			// If the table doesn't exist, log and continue (useful when images were removed)
+			if err != nil && (strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "42P01")) {
+				fmt.Printf("Note: table %s does not exist, skipping\n", table)
+				continue
+			}
+
+			// Attempt to re-enable foreign key checks before returning error
+			retryErr := db.Exec("SET session_replication_role = 'origin'").Error
+			if retryErr != nil {
+				fmt.Printf("Warning: failed to re-enable foreign key checks: %v\n", retryErr)
+			}
 			return fmt.Errorf("failed to truncate table %s: %w", table, err)
 		}
 	}
