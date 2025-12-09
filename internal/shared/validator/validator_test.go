@@ -93,6 +93,97 @@ func TestValidateStringLength(t *testing.T) {
 	}
 }
 
+func TestValidateURL(t *testing.T) {
+	tests := []struct {
+		name      string
+		url       string
+		fieldName string
+		wantErr   bool
+		errMsg    string
+	}{
+		{
+			name:      "Valid HTTPS URL",
+			url:       "https://example.com",
+			fieldName: "Link",
+			wantErr:   false,
+		},
+		{
+			name:      "Valid HTTP URL",
+			url:       "http://example.com",
+			fieldName: "Link",
+			wantErr:   false,
+		},
+		{
+			name:      "Valid HTTPS URL with path",
+			url:       "https://example.com/path/to/page",
+			fieldName: "Link",
+			wantErr:   false,
+		},
+		{
+			name:      "Empty URL (optional field)",
+			url:       "",
+			fieldName: "Link",
+			wantErr:   false,
+		},
+		{
+			name:      "JavaScript protocol (XSS attempt)",
+			url:       "javascript:alert('XSS')",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must use http:// or https:// scheme",
+		},
+		{
+			name:      "Data protocol",
+			url:       "data:text/html,<script>alert('XSS')</script>",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must use http:// or https:// scheme",
+		},
+		{
+			name:      "File protocol",
+			url:       "file:///etc/passwd",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must use http:// or https:// scheme",
+		},
+		{
+			name:      "FTP protocol",
+			url:       "ftp://example.com",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must use http:// or https:// scheme",
+		},
+		{
+			name:      "URL without scheme",
+			url:       "example.com",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must include a scheme",
+		},
+		{
+			name:      "Invalid URL format",
+			url:       "ht!tp://invalid url",
+			fieldName: "Link",
+			wantErr:   true,
+			errMsg:    "must be a valid URL",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateURL(tt.url, tt.fieldName)
+			if tt.wantErr {
+				assert.Error(t, err)
+				if tt.errMsg != "" {
+					assert.Contains(t, err.Error(), tt.errMsg)
+				}
+			} else {
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
 func TestValidateProject(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -108,6 +199,69 @@ func TestValidateProject(t *testing.T) {
 				CategoryID:  1,
 			},
 			wantErr: false,
+		},
+		{
+			name: "Valid project with HTTPS link",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "https://example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid project with HTTP link",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "http://example.com",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Valid project with empty link",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "",
+			},
+			wantErr: false,
+		},
+		{
+			name: "Invalid project with javascript: link (XSS)",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "javascript:alert('XSS')",
+			},
+			wantErr: true,
+			errMsg:  "Link must use http:// or https:// scheme",
+		},
+		{
+			name: "Invalid project with data: link",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "data:text/html,<script>alert('XSS')</script>",
+			},
+			wantErr: true,
+			errMsg:  "Link must use http:// or https:// scheme",
+		},
+		{
+			name: "Invalid project with file: link",
+			project: &models.Project{
+				Title:       "Test Project",
+				Description: "A test project description",
+				CategoryID:  1,
+				Link:        "file:///etc/passwd",
+			},
+			wantErr: true,
+			errMsg:  "Link must use http:// or https:// scheme",
 		},
 		{
 			name: "Missing title",
