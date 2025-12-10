@@ -48,9 +48,12 @@ func TestMain(m *testing.M) {
 	// Run all tests
 	code := m.Run()
 
-	// Cleanup
+	// Cleanup - with proper ordering and timing
+	fmt.Println("Starting cleanup...")
 	teardownTestServer()
+	time.Sleep(500 * time.Millisecond) // Give server time to fully stop
 	teardownTestDatabase()
+	fmt.Println("Cleanup complete")
 
 	os.Exit(code)
 }
@@ -71,10 +74,9 @@ func setupTestEnvironment() {
 	os.Setenv("GIN_MODE", "test")
 	os.Setenv("LOG_LEVEL", "error") // Reduce noise in test output
 
-	// Ensure TESTING_MODE is enabled
-	if os.Getenv("TESTING_MODE") == "" {
-		os.Setenv("TESTING_MODE", "true")
-	}
+	// Ensure TESTING_MODE is enabled - always set to true in tests
+	os.Setenv("TESTING_MODE", "true")
+	fmt.Printf("TESTING_MODE set to: %s\n", os.Getenv("TESTING_MODE"))
 
 	// Set base URL from PORT
 	port := os.Getenv("PORT")
@@ -133,11 +135,18 @@ func teardownTestServer() {
 
 func teardownTestDatabase() {
 	if testDB != nil && testDB.DB != nil {
+		// Clean database first
 		if err := cleanDatabaseWithError(testDB.DB); err != nil {
 			fmt.Printf("Warning: Failed to clean database during teardown: %v\n", err)
 		}
+
+		// Close connection pool properly
 		sqlDB, err := testDB.DB.DB()
 		if err == nil {
+			// Close idle connections before shutdown
+			sqlDB.SetMaxIdleConns(0)
+			sqlDB.SetConnMaxLifetime(time.Minute)
+
 			if err := sqlDB.Close(); err != nil {
 				fmt.Printf("Warning: Failed to close database connection: %v\n", err)
 			}
