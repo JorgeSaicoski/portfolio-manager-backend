@@ -74,10 +74,9 @@ func setupTestEnvironment() {
 	os.Setenv("GIN_MODE", "test")
 	os.Setenv("LOG_LEVEL", "error") // Reduce noise in test output
 
-	// Ensure TESTING_MODE is enabled
-	if os.Getenv("TESTING_MODE") == "" {
-		os.Setenv("TESTING_MODE", "true")
-	}
+	// Ensure TESTING_MODE is enabled - always set to true in tests
+	os.Setenv("TESTING_MODE", "true")
+	fmt.Printf("TESTING_MODE set to: %s\n", os.Getenv("TESTING_MODE"))
 
 	// Set base URL from PORT
 	port := os.Getenv("PORT")
