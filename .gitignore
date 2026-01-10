@@ -1,0 +1,12 @@
+.idea
+.claude
+
+.vscode
+*.log
+.env
+
+bin/
+pkg/
+*.exe
+*.test
+*.out
