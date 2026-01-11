@@ -17,3 +17,20 @@ type PaginationResponse struct {
 	Page  int   `json:"page"`
 	Limit int   `json:"limit"`
 }
+
+// DataResponse represents a response with data and message (API_OVERVIEW.md format)
+// Used for single resource responses
+type DataResponse struct {
+	Data    interface{} `json:"data"`
+	Message string      `json:"message"`
+}
+
+// PaginatedDataResponse represents a paginated response (API_OVERVIEW.md format)
+// Used for list/collection responses with pagination
+type PaginatedDataResponse struct {
+	Data    interface{} `json:"data"`
+	Page    int         `json:"page"`
+	Limit   int         `json:"limit"`
+	Total   int64       `json:"total"`
+	Message string      `json:"message"`
+}

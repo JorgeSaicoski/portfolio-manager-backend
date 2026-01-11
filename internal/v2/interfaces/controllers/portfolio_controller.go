@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/application/contracts"
 	appdto "github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/application/dto"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/application/usecases/portfolio"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/interfaces/dto/request"
@@ -15,27 +16,36 @@ import (
 
 // PortfolioController handles HTTP requests for portfolio operations
 type PortfolioController struct {
-	createUseCase *portfolio.CreatePortfolioUseCase
-	getUseCase    *portfolio.GetPortfolioUseCase
-	listUseCase   *portfolio.ListPortfoliosUseCase
-	updateUseCase *portfolio.UpdatePortfolioUseCase
-	deleteUseCase *portfolio.DeletePortfolioUseCase
+	createUseCase    *portfolio.CreatePortfolioUseCase
+	getUseCase       *portfolio.GetPortfolioUseCase
+	getPublicUseCase *portfolio.GetPortfolioPublicUseCase
+	listUseCase      *portfolio.ListPortfoliosUseCase
+	updateUseCase    *portfolio.UpdatePortfolioUseCase
+	deleteUseCase    *portfolio.DeletePortfolioUseCase
+	categoryRepo     contracts.CategoryRepository
+	sectionRepo      contracts.SectionRepository
 }
 
 // NewPortfolioController creates a new portfolio controller instance
 func NewPortfolioController(
 	createUC *portfolio.CreatePortfolioUseCase,
 	getUC *portfolio.GetPortfolioUseCase,
+	getPublicUC *portfolio.GetPortfolioPublicUseCase,
 	listUC *portfolio.ListPortfoliosUseCase,
 	updateUC *portfolio.UpdatePortfolioUseCase,
 	deleteUC *portfolio.DeletePortfolioUseCase,
+	categoryRepo contracts.CategoryRepository,
+	sectionRepo contracts.SectionRepository,
 ) *PortfolioController {
 	return &PortfolioController{
-		createUseCase: createUC,
-		getUseCase:    getUC,
-		listUseCase:   listUC,
-		updateUseCase: updateUC,
-		deleteUseCase: deleteUC,
+		createUseCase:    createUC,
+		getUseCase:       getUC,
+		getPublicUseCase: getPublicUC,
+		listUseCase:      listUC,
+		updateUseCase:    updateUC,
+		deleteUseCase:    deleteUC,
+		categoryRepo:     categoryRepo,
+		sectionRepo:      sectionRepo,
 	}
 }
 
@@ -267,6 +277,133 @@ func (ctrl *PortfolioController) Delete(c *gin.Context) {
 
 	// 4. Return success response
 	c.JSON(http.StatusOK, response.SuccessResponse{Message: "portfolio deleted successfully"})
+}
+
+// GetPublicByID handles GET /api/portfolios/id/:id and GET /api/portfolios/public/:id
+func (ctrl *PortfolioController) GetPublicByID(c *gin.Context) {
+	// Parse portfolio ID from URL parameter
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid portfolio ID"})
+		return
+	}
+
+	// Execute use case (no auth required for public access)
+	portfolioDTO, err := ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
+	if err != nil {
+		status := mapErrorToHTTPStatus(err)
+		c.JSON(status, response.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Map to HTTP response DTO (don't include OwnerID in public response)
+	resp := response.PortfolioResponse{
+		ID:          portfolioDTO.ID,
+		Title:       portfolioDTO.Title,
+		Description: portfolioDTO.Description,
+		CreatedAt:   portfolioDTO.CreatedAt,
+		UpdatedAt:   portfolioDTO.UpdatedAt,
+	}
+
+	// Return HTTP response with API_OVERVIEW.md format
+	c.JSON(http.StatusOK, response.DataResponse{
+		Data:    resp,
+		Message: "Success",
+	})
+}
+
+// GetPublicCategories handles GET /api/portfolios/public/:id/categories
+func (ctrl *PortfolioController) GetPublicCategories(c *gin.Context) {
+	// Parse portfolio ID from URL parameter
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid portfolio ID"})
+		return
+	}
+
+	// Verify portfolio exists
+	_, err = ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
+	if err != nil {
+		status := mapErrorToHTTPStatus(err)
+		c.JSON(status, response.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Get all categories for the portfolio
+	categories, err := ctrl.categoryRepo.GetByPortfolioID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.ErrorResponse{Error: "failed to retrieve categories"})
+		return
+	}
+
+	// Map to HTTP response DTOs
+	categoryResponses := make([]response.CategoryResponse, len(categories))
+	for i, cat := range categories {
+		categoryResponses[i] = response.CategoryResponse{
+			ID:          cat.ID,
+			Title:       cat.Title,
+			Description: cat.Description,
+			Position:    cat.Position,
+			PortfolioID: cat.PortfolioID,
+			CreatedAt:   cat.CreatedAt,
+			UpdatedAt:   cat.UpdatedAt,
+		}
+	}
+
+	// Return HTTP response with API_OVERVIEW.md format
+	c.JSON(http.StatusOK, response.DataResponse{
+		Data:    categoryResponses,
+		Message: "Success",
+	})
+}
+
+// GetPublicSections handles GET /api/portfolios/public/:id/sections
+func (ctrl *PortfolioController) GetPublicSections(c *gin.Context) {
+	// Parse portfolio ID from URL parameter
+	idStr := c.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid portfolio ID"})
+		return
+	}
+
+	// Verify portfolio exists
+	_, err = ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
+	if err != nil {
+		status := mapErrorToHTTPStatus(err)
+		c.JSON(status, response.ErrorResponse{Error: err.Error()})
+		return
+	}
+
+	// Get all sections for the portfolio
+	sections, err := ctrl.sectionRepo.GetByPortfolioID(c.Request.Context(), uint(id))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, response.ErrorResponse{Error: "failed to retrieve sections"})
+		return
+	}
+
+	// Map to HTTP response DTOs
+	sectionResponses := make([]response.SectionResponse, len(sections))
+	for i, sec := range sections {
+		sectionResponses[i] = response.SectionResponse{
+			ID:          sec.ID,
+			Title:       sec.Title,
+			Description: sec.Description,
+			Position:    sec.Position,
+			Type:        sec.Type,
+			PortfolioID: sec.PortfolioID,
+			CreatedAt:   sec.CreatedAt,
+			UpdatedAt:   sec.UpdatedAt,
+		}
+	}
+
+	// Return HTTP response with API_OVERVIEW.md format
+	c.JSON(http.StatusOK, response.DataResponse{
+		Data:    sectionResponses,
+		Message: "Success",
+	})
 }
 
 // mapErrorToHTTPStatus maps domain errors to appropriate HTTP status codes
