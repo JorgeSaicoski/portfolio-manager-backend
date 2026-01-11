@@ -3,7 +3,6 @@ package controllers
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
 	"github.com/gin-gonic/gin"
 
@@ -11,6 +10,7 @@ import (
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/application/usecases/category"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/interfaces/dto/request"
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/interfaces/dto/response"
+	pkgerrors "github.com/JorgeSaicoski/portfolio-manager/backend/pkg/errors"
 )
 
 // CategoryController handles HTTP requests for category operations
@@ -76,7 +76,7 @@ func (ctrl *CategoryController) Create(c *gin.Context) {
 	// Execute use case
 	categoryDTO, err := ctrl.createUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -136,7 +136,7 @@ func (ctrl *CategoryController) List(c *gin.Context) {
 	// Execute use case
 	output, err := ctrl.listUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -186,7 +186,7 @@ func (ctrl *CategoryController) GetByID(c *gin.Context) {
 	// Execute use case
 	categoryDTO, err := ctrl.getUseCase.Execute(c.Request.Context(), uint(id), userID)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -246,7 +246,7 @@ func (ctrl *CategoryController) Update(c *gin.Context) {
 	// Execute use case
 	err = ctrl.updateUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -269,7 +269,7 @@ func (ctrl *CategoryController) UpdatePosition(c *gin.Context) {
 
 	// Parse category ID from URL parameter
 	idStr := c.Param("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
+	categoryID, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, response.ErrorResponse{Error: "invalid category ID"})
 		return
@@ -283,9 +283,9 @@ func (ctrl *CategoryController) UpdatePosition(c *gin.Context) {
 	}
 
 	// Execute use case
-	err = ctrl.updatePositionUseCase.Execute(c.Request.Context(), uint(id), req.Position, userID)
+	err = ctrl.updatePositionUseCase.Execute(c.Request.Context(), uint(categoryID), req.Position, userID)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -328,9 +328,8 @@ func (ctrl *CategoryController) BulkReorder(c *gin.Context) {
 	}
 
 	// Execute use case
-	err := ctrl.bulkReorderUseCase.Execute(c.Request.Context(), input)
-	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+	if err := ctrl.bulkReorderUseCase.Execute(c.Request.Context(), input); err != nil {
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -362,7 +361,7 @@ func (ctrl *CategoryController) Delete(c *gin.Context) {
 	// Execute use case
 	err = ctrl.deleteUseCase.Execute(c.Request.Context(), uint(id), userID)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -387,7 +386,7 @@ func (ctrl *CategoryController) GetPublicByID(c *gin.Context) {
 	// Execute use case (no auth required for public access)
 	categoryDTO, err := ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -423,24 +422,4 @@ func (ctrl *CategoryController) GetPublicProjects(c *gin.Context) {
 
 	// TODO: Implement projects retrieval when Project domain is ready
 	c.JSON(http.StatusNotImplemented, response.ErrorResponse{Error: "not implemented yet"})
-}
-
-// mapErrorToHTTPStatus maps domain errors to appropriate HTTP status codes
-func mapErrorToHTTPStatus(err error) int {
-	errMsg := strings.ToLower(err.Error())
-
-	switch {
-	case strings.Contains(errMsg, "not found"):
-		return http.StatusNotFound
-	case strings.Contains(errMsg, "unauthorized"):
-		return http.StatusForbidden
-	case strings.Contains(errMsg, "already exists"):
-		return http.StatusConflict
-	case strings.Contains(errMsg, "required"):
-		return http.StatusBadRequest
-	case strings.Contains(errMsg, "invalid"):
-		return http.StatusBadRequest
-	default:
-		return http.StatusInternalServerError
-	}
 }

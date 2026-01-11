@@ -3,8 +3,8 @@ package controllers
 import (
 	"net/http"
 	"strconv"
-	"strings"
 
+	pkgerrors "github.com/JorgeSaicoski/portfolio-manager/backend/pkg/errors"
 	"github.com/gin-gonic/gin"
 
 	"github.com/JorgeSaicoski/portfolio-manager/backend/internal/v2/application/contracts"
@@ -75,7 +75,7 @@ func (ctrl *PortfolioController) Create(c *gin.Context) {
 	// 4. Execute use case
 	portfolioDTO, err := ctrl.createUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -130,7 +130,7 @@ func (ctrl *PortfolioController) List(c *gin.Context) {
 	// 4. Execute use case
 	output, err := ctrl.listUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -181,7 +181,7 @@ func (ctrl *PortfolioController) GetByID(c *gin.Context) {
 	// 3. Execute use case
 	portfolioDTO, err := ctrl.getUseCase.Execute(c.Request.Context(), uint(id))
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -241,7 +241,7 @@ func (ctrl *PortfolioController) Update(c *gin.Context) {
 	// 5. Execute use case (use case handles ownership check)
 	err = ctrl.updateUseCase.Execute(c.Request.Context(), input)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -270,7 +270,7 @@ func (ctrl *PortfolioController) Delete(c *gin.Context) {
 	// 3. Execute use case (use case handles ownership check)
 	err = ctrl.deleteUseCase.Execute(c.Request.Context(), uint(id), userID)
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -292,7 +292,7 @@ func (ctrl *PortfolioController) GetPublicByID(c *gin.Context) {
 	// Execute use case (no auth required for public access)
 	portfolioDTO, err := ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -326,7 +326,7 @@ func (ctrl *PortfolioController) GetPublicCategories(c *gin.Context) {
 	// Verify portfolio exists
 	_, err = ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -372,7 +372,7 @@ func (ctrl *PortfolioController) GetPublicSections(c *gin.Context) {
 	// Verify portfolio exists
 	_, err = ctrl.getPublicUseCase.Execute(c.Request.Context(), uint(id))
 	if err != nil {
-		status := mapErrorToHTTPStatus(err)
+		status := pkgerrors.ToHTTPStatus(err)
 		c.JSON(status, response.ErrorResponse{Error: err.Error()})
 		return
 	}
@@ -404,24 +404,4 @@ func (ctrl *PortfolioController) GetPublicSections(c *gin.Context) {
 		Data:    sectionResponses,
 		Message: "Success",
 	})
-}
-
-// mapErrorToHTTPStatus maps domain errors to appropriate HTTP status codes
-func mapErrorToHTTPStatus(err error) int {
-	errMsg := strings.ToLower(err.Error())
-
-	switch {
-	case strings.Contains(errMsg, "not found"):
-		return http.StatusNotFound
-	case strings.Contains(errMsg, "unauthorized"):
-		return http.StatusForbidden
-	case strings.Contains(errMsg, "already exists"):
-		return http.StatusConflict
-	case strings.Contains(errMsg, "required"):
-		return http.StatusBadRequest
-	case strings.Contains(errMsg, "invalid"):
-		return http.StatusBadRequest
-	default:
-		return http.StatusInternalServerError
-	}
 }
