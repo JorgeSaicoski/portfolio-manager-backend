@@ -8,7 +8,7 @@ import (
 	response2 "github.com/JorgeSaicoski/portfolio-manager/backend/internal/interfaces/dto/response"
 	"github.com/gin-gonic/gin"
 
-	"github.com/JorgeSaicoski/portfolio-manager/backend/pkg/pkgerrors"
+	pkgerrors "github.com/JorgeSaicoski/portfolio-manager/backend/pkg/errors"
 )
 
 // UserController handles HTTP requests for user operations
